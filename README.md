@@ -65,6 +65,25 @@ Nao ha cadastro publico. O primeiro acesso (ADMIN) e criado pelo seed a partir d
 Refresh tokens sao opacos (nao sao JWT), armazenados como hash SHA-256 no banco e
 rotacionados a cada uso — permitindo revogacao imediata em caso de logout ou comprometimento.
 
+## Produtos e estoque
+
+| Endpoint | Acesso | Descricao |
+| --- | --- | --- |
+| `POST /v1/categories` | ADMIN | Cria uma categoria |
+| `GET /v1/categories` | Autenticado | Lista categorias |
+| `POST /v1/products` | ADMIN | Cria um produto (SKU e codigo de barras unicos) |
+| `GET /v1/products` | Autenticado | Lista produtos (busca, filtro por categoria/status, paginacao) |
+| `GET /v1/products/:id` | Autenticado | Detalha um produto |
+| `PATCH /v1/products/:id` | ADMIN | Atualiza um produto |
+| `DELETE /v1/products/:id` | ADMIN | Desativa um produto (soft delete, preserva historico) |
+| `POST /v1/stock-movements` | Autenticado | Registra ENTRADA / SAIDA / AJUSTE |
+| `GET /v1/stock-movements` | Autenticado | Lista movimentacoes (filtro por produto/tipo, paginacao) |
+
+O saldo de estoque (`currentStock`) nunca e editado diretamente: toda alteracao passa por
+uma `StockMovement`, criada e aplicada numa unica transacao (a movimentacao so e
+persistida se o novo saldo for valido). `SAIDA` bloqueia estoque insuficiente; `AJUSTE`
+aceita um delta positivo ou negativo para correcoes de inventario.
+
 ## Testes
 
 ```bash
@@ -84,7 +103,7 @@ npm run test:e2e --workspace=apps/api    # e2e
 
 - [x] Estrutura do monorepo, schema de dados, CI/CD
 - [x] Autenticacao e controle de acesso por papel
-- [ ] Cadastro de produtos e movimentacoes de estoque
+- [x] Cadastro de produtos e movimentacoes de estoque
 - [ ] Fornecedores e alertas de estoque minimo
 - [ ] Fluxo de venda com emissao fiscal (NF-e)
 - [ ] Dashboard com graficos e leitura de codigo de barras/QR

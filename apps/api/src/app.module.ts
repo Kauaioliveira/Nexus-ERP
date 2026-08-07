@@ -7,6 +7,9 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { ProductsModule } from './modules/products/products.module';
+import { StockMovementsModule } from './modules/stock-movements/stock-movements.module';
 
 @Module({
   imports: [
@@ -15,8 +18,11 @@ import { UsersModule } from './modules/users/users.module';
     PrismaModule,
     AuthModule,
     UsersModule,
-    // Modulos de dominio (products, stock-movements, suppliers, sales,
-    // fiscal) sao adicionados incrementalmente nas proximas etapas.
+    CategoriesModule,
+    ProductsModule,
+    StockMovementsModule,
+    // Modulos de dominio (suppliers, sales, fiscal) sao adicionados
+    // incrementalmente nas proximas etapas.
   ],
   controllers: [AppController],
   providers: [

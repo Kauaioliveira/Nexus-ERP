@@ -28,8 +28,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: 22
       - run: npm install --workspace=apps/api
       - run: npm run prisma:generate --workspace=apps/api
       - run: npm run lint --workspace=apps/api
@@ -42,8 +41,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: 22
       - run: npm install --workspace=apps/web
       - run: npm run lint --workspace=apps/web
       - run: npm run build --workspace=apps/web
@@ -54,7 +52,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: 22
       - run: npm install --workspace=apps/api --workspace=apps/web
       - run: npm audit --audit-level=high --workspaces || true

@@ -1,0 +1,184 @@
+// Nexus ERP - schema de dados
+// Dominio: controle de estoque multiusuario para uma loja, com emissao fiscal integrada.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+}
+
+enum MovementType {
+  ENTRADA
+  SAIDA
+  AJUSTE
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum FiscalStatus {
+  NOT_REQUESTED
+  QUEUED
+  PROCESSING
+  ISSUED
+  FAILED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(OPERATOR)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  stockMovements StockMovement[]
+  sales          Sale[]
+  refreshTokens  RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revoked   Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  products Product[]
+
+  @@map("categories")
+}
+
+model Supplier {
+  id        String    @id @default(uuid())
+  name      String
+  document  String?   @unique // CNPJ/CPF
+  email     String?
+  phone     String?
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  products  Product[]
+
+  @@map("suppliers")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  sku         String   @unique
+  barcode     String?  @unique
+  name        String
+  description String?
+  unit        String   @default("UN") // UN, KG, CX, etc.
+  costPrice   Decimal  @db.Decimal(12, 2)
+  salePrice   Decimal  @db.Decimal(12, 2)
+  minStock    Int      @default(0)
+  currentStock Int     @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+
+  stockMovements StockMovement[]
+  saleItems      SaleItem[]
+
+  @@index([categoryId])
+  @@index([supplierId])
+  @@map("products")
+}
+
+model StockMovement {
+  id        String       @id @default(uuid())
+  type      MovementType
+  quantity  Int
+  reason    String?
+  unitCost  Decimal?     @db.Decimal(12, 2)
+  createdAt DateTime     @default(now())
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([productId])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+model Sale {
+  id        String     @id @default(uuid())
+  status    SaleStatus @default(PENDING)
+  total     Decimal    @db.Decimal(12, 2)
+  createdAt DateTime   @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  items          SaleItem[]
+  fiscalDocument FiscalDocument?
+
+  @@index([createdAt])
+  @@map("sales")
+}
+
+model SaleItem {
+  id        String  @id @default(uuid())
+  quantity  Int
+  unitPrice Decimal @db.Decimal(12, 2)
+
+  saleId String
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("sale_items")
+}
+
+// Abstracao para provedor fiscal (Focus NFe, PlugNotas, NFe.io, etc).
+// O campo `provider` guarda qual adapter foi usado, permitindo trocar de
+// integracao sem alterar o restante do dominio.
+model FiscalDocument {
+  id           String       @id @default(uuid())
+  provider     String // ex: "focus-nfe-sandbox"
+  status       FiscalStatus @default(NOT_REQUESTED)
+  externalId   String? // id/protocolo retornado pelo provedor
+  xmlUrl       String?
+  pdfUrl       String?
+  errorMessage String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  saleId String @unique
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@map("fiscal_documents")
+}

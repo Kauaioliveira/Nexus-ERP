@@ -42,10 +42,28 @@ docker compose up -d postgres redis
 
 npm install --workspace=apps/api
 npm run prisma:migrate --workspace=apps/api
+npm run prisma:seed --workspace=apps/api    # cria o usuario ADMIN inicial
 
 npm run dev:api    # http://localhost:3333
 npm run dev:web    # http://localhost:3000
 ```
+
+## Autenticacao
+
+Nao ha cadastro publico. O primeiro acesso (ADMIN) e criado pelo seed a partir de
+`SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` no `.env`; a partir dele, novos usuarios
+(ADMIN ou OPERATOR) sao criados via `POST /v1/users`.
+
+| Endpoint | Acesso | Descricao |
+| --- | --- | --- |
+| `POST /v1/auth/login` | Publico (rate limited) | Retorna access token (15 min) e refresh token (7 dias) |
+| `POST /v1/auth/refresh` | Publico | Rotaciona o refresh token e emite um novo par |
+| `POST /v1/auth/logout` | Publico | Revoga um refresh token |
+| `GET /v1/auth/me` | Autenticado | Retorna o perfil do usuario logado |
+| `POST /v1/users` | ADMIN | Cria um novo usuario |
+
+Refresh tokens sao opacos (nao sao JWT), armazenados como hash SHA-256 no banco e
+rotacionados a cada uso — permitindo revogacao imediata em caso de logout ou comprometimento.
 
 ## Testes
 
@@ -65,7 +83,7 @@ npm run test:e2e --workspace=apps/api    # e2e
 ## Roadmap
 
 - [x] Estrutura do monorepo, schema de dados, CI/CD
-- [ ] Autenticacao e controle de acesso por papel
+- [x] Autenticacao e controle de acesso por papel
 - [ ] Cadastro de produtos e movimentacoes de estoque
 - [ ] Fornecedores e alertas de estoque minimo
 - [ ] Fluxo de venda com emissao fiscal (NF-e)

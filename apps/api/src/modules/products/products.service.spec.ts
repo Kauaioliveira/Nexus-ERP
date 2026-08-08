@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CreateProductDto } from './dto/create-product.dto';
 import { ProductsService } from './products.service';
 
 function uniqueConstraintError() {
@@ -45,12 +46,13 @@ describe('ProductsService', () => {
     it('creates a product', async () => {
       prisma.product.create.mockResolvedValue({ id: '1', sku: 'SKU-1' });
 
-      const result = await service.create({
+      const dto: CreateProductDto = {
         sku: 'SKU-1',
         name: 'Produto 1',
         costPrice: 10,
         salePrice: 20,
-      } as any);
+      };
+      const result = await service.create(dto);
 
       expect(result).toEqual({ id: '1', sku: 'SKU-1' });
     });
@@ -58,9 +60,8 @@ describe('ProductsService', () => {
     it('translates a unique constraint violation into ConflictException', async () => {
       prisma.product.create.mockRejectedValue(uniqueConstraintError());
 
-      await expect(
-        service.create({ sku: 'DUP', name: 'Produto', costPrice: 1, salePrice: 2 } as any),
-      ).rejects.toBeInstanceOf(ConflictException);
+      const dto: CreateProductDto = { sku: 'DUP', name: 'Produto', costPrice: 1, salePrice: 2 };
+      await expect(service.create(dto)).rejects.toBeInstanceOf(ConflictException);
     });
   });
 

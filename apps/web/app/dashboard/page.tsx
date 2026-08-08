@@ -33,6 +33,19 @@ function buildMovementsChartData(movements: StockMovement[]) {
   return (['ENTRADA', 'SAIDA', 'AJUSTE'] as const).map((type) => ({ type, count: counts[type] }));
 }
 
+// Os graficos sao SVGs sem texto para leitores de tela; role="img" +
+// aria-label expoe um resumo equivalente dos mesmos dados (WCAG 1.1.1).
+function buildSalesSummary(data: { date: string; total: number }[]): string {
+  if (data.length === 0) return 'Nenhuma venda registrada nos ultimos dias.';
+  const parts = data.map((point) => `dia ${point.date}: R$ ${point.total.toFixed(2)}`);
+  return `Vendas por dia. ${parts.join('; ')}.`;
+}
+
+function buildMovementsSummary(data: { type: string; count: number }[]): string {
+  const parts = data.map((point) => `${point.type.toLowerCase()}: ${point.count}`);
+  return `Movimentacoes de estoque por tipo. ${parts.join('; ')}.`;
+}
+
 export default async function DashboardOverviewPage() {
   const [productsPage, lowStock, salesPage, movementsPage] = await Promise.all([
     apiFetch<PaginatedResponse<Product>>('/products?pageSize=1'),
@@ -66,13 +79,17 @@ export default async function DashboardOverviewPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-5">
           <h2 className="text-sm font-semibold text-slate-700">Vendas nos ultimos dias</h2>
           <p className="mb-4 text-xs text-slate-500">Total faturado por dia (baseado nas ultimas 50 vendas)</p>
-          <SalesChart data={salesChartData} />
+          <div role="img" aria-label={buildSalesSummary(salesChartData)}>
+            <SalesChart data={salesChartData} />
+          </div>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-5">
           <h2 className="text-sm font-semibold text-slate-700">Movimentacoes de estoque</h2>
           <p className="mb-4 text-xs text-slate-500">Por tipo (baseado nas ultimas 50 movimentacoes)</p>
-          <MovementsChart data={movementsChartData} />
+          <div role="img" aria-label={buildMovementsSummary(movementsChartData)}>
+            <MovementsChart data={movementsChartData} />
+          </div>
         </div>
       </div>
 

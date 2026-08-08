@@ -155,11 +155,23 @@ npm run test:e2e --workspace=apps/api    # e2e
 
 ## Qualidade e seguranca
 
-- Validacao de entrada com `class-validator` em todos os DTOs.
-- Rate limiting (`@nestjs/throttler`) e headers de seguranca (Helmet) na API.
-- Headers de seguranca tambem no Next.js (`X-Frame-Options`, `X-Content-Type-Options`).
-- Pipeline de CI roda lint, testes e `npm audit` a cada push.
-- Auditoria de acessibilidade (WCAG 2.1 AA) no frontend antes de cada release.
+- Validacao de entrada com `class-validator` em todos os DTOs (`whitelist` +
+  `forbidNonWhitelisted` no `ValidationPipe` global, rejeita campos nao esperados).
+- Senhas com hash `argon2`; refresh tokens opacos, hash SHA-256 no banco e rotacionados a
+  cada uso.
+- Rate limiting global (`@nestjs/throttler`, 100 req/min) com limite mais restrito no login
+  (5/min) e headers de seguranca (Helmet) na API.
+- Headers de seguranca tambem no Next.js (`X-Frame-Options`, `X-Content-Type-Options`,
+  `Referrer-Policy`); tokens de sessao em cookies `httpOnly` + `sameSite=lax`.
+- Pipeline de CI roda lint, testes (com cobertura) e `npm audit` a cada push; Dependabot
+  atualiza dependencias npm (api/web) e GitHub Actions semanalmente.
+- Auditoria de acessibilidade (WCAG 2.1 AA) aplicada ao frontend: labels em todos os campos
+  de formulario e filtros (inclusive ocultos visualmente com `sr-only` quando o placeholder
+  ja e autoexplicativo), `scope` nas colunas de tabela, `aria-current` na navegacao ativa,
+  indicadores de estoque baixo que nao dependem so de cor, resumo em texto (`role="img"` +
+  `aria-label`) para os graficos, alternativa de digitacao manual para o leitor de
+  codigo (funciona sem camera e por teclado) e navegacao lateral responsiva (nao
+  desaparece em telas pequenas).
 
 ## Roadmap
 
@@ -170,7 +182,7 @@ npm run test:e2e --workspace=apps/api    # e2e
 - [x] Fluxo de venda com emissao fiscal (NF-e)
 - [x] Frontend: autenticacao, layout protegido e gestao de produtos
 - [x] Dashboard com graficos e leitura de codigo de barras/QR
-- [ ] Revisao final de qualidade e seguranca
+- [x] Revisao final de qualidade e seguranca
 
 ## Licenca
 

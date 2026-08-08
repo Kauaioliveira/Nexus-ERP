@@ -41,26 +41,52 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       </div>
 
       <form method="GET" className="flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-white p-4">
-        <input
-          type="search"
-          name="search"
-          placeholder="Buscar por nome, SKU ou codigo de barras"
-          defaultValue={searchParams.search}
-          className="min-w-[240px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-        />
-        <select name="categoryId" defaultValue={searchParams.categoryId ?? ''} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-          <option value="">Todas as categorias</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
-        <select name="active" defaultValue={searchParams.active ?? ''} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-          <option value="">Ativos e inativos</option>
-          <option value="true">Somente ativos</option>
-          <option value="false">Somente inativos</option>
-        </select>
+        <div className="min-w-[240px] flex-1">
+          <label htmlFor="search" className="sr-only">
+            Buscar por nome, SKU ou codigo de barras
+          </label>
+          <input
+            id="search"
+            type="search"
+            name="search"
+            placeholder="Buscar por nome, SKU ou codigo de barras"
+            defaultValue={searchParams.search}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="categoryId" className="sr-only">
+            Filtrar por categoria
+          </label>
+          <select
+            id="categoryId"
+            name="categoryId"
+            defaultValue={searchParams.categoryId ?? ''}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="">Todas as categorias</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="active" className="sr-only">
+            Filtrar por status
+          </label>
+          <select
+            id="active"
+            name="active"
+            defaultValue={searchParams.active ?? ''}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="">Ativos e inativos</option>
+            <option value="true">Somente ativos</option>
+            <option value="false">Somente inativos</option>
+          </select>
+        </div>
         <button type="submit" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
           Filtrar
         </button>
@@ -70,12 +96,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-3">SKU</th>
-              <th className="px-4 py-3">Nome</th>
-              <th className="px-4 py-3">Categoria</th>
-              <th className="px-4 py-3 text-right">Estoque</th>
-              <th className="px-4 py-3 text-right">Preco</th>
-              <th className="px-4 py-3">Status</th>
+              <th scope="col" className="px-4 py-3">SKU</th>
+              <th scope="col" className="px-4 py-3">Nome</th>
+              <th scope="col" className="px-4 py-3">Categoria</th>
+              <th scope="col" className="px-4 py-3 text-right">Estoque</th>
+              <th scope="col" className="px-4 py-3 text-right">Preco</th>
+              <th scope="col" className="px-4 py-3">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -88,12 +114,17 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-slate-600">{product.category?.name ?? '-'}</td>
-                <td
-                  className={`px-4 py-3 text-right ${
-                    product.currentStock <= product.minStock ? 'font-semibold text-amber-600' : 'text-slate-700'
-                  }`}
-                >
-                  {product.currentStock}
+                <td className="px-4 py-3 text-right text-slate-700">
+                  {product.currentStock <= product.minStock ? (
+                    <span className="inline-flex items-center gap-1 font-semibold text-amber-700">
+                      {product.currentStock}
+                      <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                        baixo
+                      </span>
+                    </span>
+                  ) : (
+                    product.currentStock
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right text-slate-700">
                   {Number(product.salePrice).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}

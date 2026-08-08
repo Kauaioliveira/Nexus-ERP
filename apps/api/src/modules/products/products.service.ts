@@ -46,6 +46,23 @@ export class ProductsService {
     return { items, total, page, pageSize };
   }
 
+  // Produtos ativos cujo saldo caiu para o minimo (ou abaixo). Ordenado do
+  // mais critico para o menos critico. Para o volume de uma unica loja,
+  // filtrar em memoria e mais simples e seguro do que comparar duas colunas
+  // via SQL bruto; catalogos muito maiores se beneficiariam de uma consulta
+  // com $queryRaw (WHERE "currentStock" <= "minStock" direto no banco).
+  async findLowStock() {
+    const products = await this.prisma.product.findMany({
+      where: { active: true },
+      include: { supplier: true, category: true },
+      orderBy: { name: 'asc' },
+    });
+
+    return products
+      .filter((product) => product.currentStock <= product.minStock)
+      .sort((a, b) => a.currentStock - a.minStock - (b.currentStock - b.minStock));
+  }
+
   async findOneOrThrow(id: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },

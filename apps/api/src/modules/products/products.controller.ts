@@ -39,6 +39,12 @@ export class ProductsController {
     return this.productsService.findAll(query);
   }
 
+  // Precisa vir antes de ':id' para nao ser interpretado como um UUID.
+  @Get('low-stock')
+  findLowStock() {
+    return this.productsService.findLowStock();
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.productsService.findOneOrThrow(id);

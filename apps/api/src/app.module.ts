@@ -10,6 +10,7 @@ import { UsersModule } from './modules/users/users.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ProductsModule } from './modules/products/products.module';
 import { StockMovementsModule } from './modules/stock-movements/stock-movements.module';
+import { SuppliersModule } from './modules/suppliers/suppliers.module';
 
 @Module({
   imports: [
@@ -21,8 +22,9 @@ import { StockMovementsModule } from './modules/stock-movements/stock-movements.
     CategoriesModule,
     ProductsModule,
     StockMovementsModule,
-    // Modulos de dominio (suppliers, sales, fiscal) sao adicionados
-    // incrementalmente nas proximas etapas.
+    SuppliersModule,
+    // Modulos de dominio (sales, fiscal) sao adicionados incrementalmente
+    // nas proximas etapas.
   ],
   controllers: [AppController],
   providers: [

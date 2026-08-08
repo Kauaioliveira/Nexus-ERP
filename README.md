@@ -78,11 +78,26 @@ rotacionados a cada uso — permitindo revogacao imediata em caso de logout ou c
 | `DELETE /v1/products/:id` | ADMIN | Desativa um produto (soft delete, preserva historico) |
 | `POST /v1/stock-movements` | Autenticado | Registra ENTRADA / SAIDA / AJUSTE |
 | `GET /v1/stock-movements` | Autenticado | Lista movimentacoes (filtro por produto/tipo, paginacao) |
+| `GET /v1/products/low-stock` | Autenticado | Produtos ativos com saldo no minimo ou abaixo, do mais critico ao menos critico |
 
 O saldo de estoque (`currentStock`) nunca e editado diretamente: toda alteracao passa por
 uma `StockMovement`, criada e aplicada numa unica transacao (a movimentacao so e
 persistida se o novo saldo for valido). `SAIDA` bloqueia estoque insuficiente; `AJUSTE`
 aceita um delta positivo ou negativo para correcoes de inventario.
+
+## Fornecedores
+
+| Endpoint | Acesso | Descricao |
+| --- | --- | --- |
+| `POST /v1/suppliers` | ADMIN | Cria um fornecedor (documento CNPJ/CPF unico, se informado) |
+| `GET /v1/suppliers` | Autenticado | Lista fornecedores (busca, filtro por status, paginacao) |
+| `GET /v1/suppliers/:id` | Autenticado | Detalha um fornecedor |
+| `PATCH /v1/suppliers/:id` | ADMIN | Atualiza um fornecedor |
+| `DELETE /v1/suppliers/:id` | ADMIN | Desativa um fornecedor (soft delete) |
+
+Produtos podem ser vinculados a um fornecedor (`supplierId`); o relatorio de estoque
+baixo (`GET /v1/products/low-stock`) ja traz os dados do fornecedor de cada item, para
+facilitar a reposicao.
 
 ## Testes
 
@@ -104,7 +119,7 @@ npm run test:e2e --workspace=apps/api    # e2e
 - [x] Estrutura do monorepo, schema de dados, CI/CD
 - [x] Autenticacao e controle de acesso por papel
 - [x] Cadastro de produtos e movimentacoes de estoque
-- [ ] Fornecedores e alertas de estoque minimo
+- [x] Fornecedores e alertas de estoque minimo
 - [ ] Fluxo de venda com emissao fiscal (NF-e)
 - [ ] Dashboard com graficos e leitura de codigo de barras/QR
 - [ ] Revisao final de qualidade e seguranca

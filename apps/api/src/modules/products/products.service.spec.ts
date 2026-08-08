@@ -130,4 +130,22 @@ describe('ProductsService', () => {
       expect(findManyArgs.take).toBe(10);
     });
   });
+
+  describe('findLowStock', () => {
+    it('returns only active products at or below minStock, most critical first', async () => {
+      prisma.product.findMany.mockResolvedValue([
+        { id: '1', name: 'A', currentStock: 5, minStock: 10 }, // -5
+        { id: '2', name: 'B', currentStock: 20, minStock: 5 }, // +15, acima do minimo
+        { id: '3', name: 'C', currentStock: 0, minStock: 3 }, // -3
+        { id: '4', name: 'D', currentStock: -2, minStock: 10 }, // -12, mais critico
+      ]);
+
+      const result = await service.findLowStock();
+
+      expect(result.map((p) => p.id)).toEqual(['4', '1', '3']);
+      expect(prisma.product.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { active: true } }),
+      );
+    });
+  });
 });

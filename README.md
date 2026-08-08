@@ -99,6 +99,29 @@ Produtos podem ser vinculados a um fornecedor (`supplierId`); o relatorio de est
 baixo (`GET /v1/products/low-stock`) ja traz os dados do fornecedor de cada item, para
 facilitar a reposicao.
 
+## Vendas e emissao fiscal
+
+| Endpoint | Acesso | Descricao |
+| --- | --- | --- |
+| `POST /v1/sales` | Autenticado | Registra uma venda (um ou mais itens) |
+| `GET /v1/sales` | Autenticado | Lista vendas (filtro por status, paginacao) |
+| `GET /v1/sales/:id` | Autenticado | Detalha uma venda, incluindo o status da NF-e |
+
+Uma venda e processada numa unica transacao: valida estoque de cada item, grava os
+`SaleItem` com o preco praticado no momento (nao o preco atual do produto), gera a
+`StockMovement` do tipo `SAIDA` correspondente e cria o `FiscalDocument` inicial
+(`QUEUED`). Só depois da transacao ser confirmada e que a emissao da NF-e e
+**enfileirada** (BullMQ/Redis) — assim uma eventual indisponibilidade do Redis nunca
+impede a venda de ser concluida.
+
+Um worker consome a fila (`fiscal-emission`) e chama o `FiscalProvider` configurado —
+hoje um adapter `sandbox` que simula a resposta de um provedor real (Focus NFe,
+PlugNotas, NFe.io) em homologacao. Falhas sao tentadas novamente automaticamente (3
+tentativas, backoff exponencial) e o status fica visível em `FiscalDocument.status`
+(`QUEUED` → `PROCESSING` → `ISSUED` ou `FAILED`). Trocar para um provedor real e questao
+de implementar um novo adapter em `fiscal-provider.factory.ts` — nenhum outro modulo
+precisa mudar.
+
 ## Testes
 
 ```bash
@@ -120,7 +143,7 @@ npm run test:e2e --workspace=apps/api    # e2e
 - [x] Autenticacao e controle de acesso por papel
 - [x] Cadastro de produtos e movimentacoes de estoque
 - [x] Fornecedores e alertas de estoque minimo
-- [ ] Fluxo de venda com emissao fiscal (NF-e)
+- [x] Fluxo de venda com emissao fiscal (NF-e)
 - [ ] Dashboard com graficos e leitura de codigo de barras/QR
 - [ ] Revisao final de qualidade e seguranca
 

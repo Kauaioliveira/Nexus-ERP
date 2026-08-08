@@ -122,6 +122,22 @@ tentativas, backoff exponencial) e o status fica visível em `FiscalDocument.sta
 de implementar um novo adapter em `fiscal-provider.factory.ts` — nenhum outro modulo
 precisa mudar.
 
+## Frontend (web)
+
+Next.js 14 App Router, com Server Components para leitura de dados e Server Actions para
+mutacoes. O access/refresh token ficam em cookies `httpOnly` (nunca acessiveis via JS no
+navegador); um `middleware.ts` protege `/dashboard/*`, redireciona para `/login` quando
+necessario e renova o access token proativamente usando o refresh token antes que ele
+expire.
+
+| Rota | Descricao |
+| --- | --- |
+| `/login` | Formulario de login (Server Action `loginAction`) |
+| `/dashboard` | Visao geral: total de produtos e alerta de estoque baixo |
+| `/dashboard/products` | Lista de produtos com busca, filtro por categoria/status e paginacao |
+| `/dashboard/products/new` | Cadastro de produto |
+| `/dashboard/products/[id]` | Edicao e desativacao de produto |
+
 ## Testes
 
 ```bash
@@ -144,6 +160,7 @@ npm run test:e2e --workspace=apps/api    # e2e
 - [x] Cadastro de produtos e movimentacoes de estoque
 - [x] Fornecedores e alertas de estoque minimo
 - [x] Fluxo de venda com emissao fiscal (NF-e)
+- [x] Frontend: autenticacao, layout protegido e gestao de produtos
 - [ ] Dashboard com graficos e leitura de codigo de barras/QR
 - [ ] Revisao final de qualidade e seguranca
 

@@ -40,6 +40,25 @@ export interface Product {
   supplier?: Supplier | null;
 }
 
+export type MovementType = 'ENTRADA' | 'SAIDA' | 'AJUSTE';
+export type SaleStatus = 'PENDING' | 'COMPLETED' | 'CANCELLED';
+
+export interface StockMovement {
+  id: string;
+  type: MovementType;
+  quantity: number;
+  reason: string | null;
+  createdAt: string;
+  product: { id: string; sku: string; name: string };
+}
+
+export interface Sale {
+  id: string;
+  status: SaleStatus;
+  total: string;
+  createdAt: string;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;

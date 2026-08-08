@@ -4,6 +4,7 @@ import { Role } from '@/lib/types';
 const links = [
   { href: '/dashboard', label: 'Visao geral' },
   { href: '/dashboard/products', label: 'Produtos' },
+  { href: '/dashboard/scan', label: 'Leitor de codigo' },
 ];
 
 export function Sidebar({ role }: { role: Role }) {

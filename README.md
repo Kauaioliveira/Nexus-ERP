@@ -133,10 +133,18 @@ expire.
 | Rota | Descricao |
 | --- | --- |
 | `/login` | Formulario de login (Server Action `loginAction`) |
-| `/dashboard` | Visao geral: total de produtos e alerta de estoque baixo |
+| `/dashboard` | Visao geral: cards de resumo, grafico de vendas por dia e de movimentacoes por tipo, alerta de estoque baixo |
 | `/dashboard/products` | Lista de produtos com busca, filtro por categoria/status e paginacao |
 | `/dashboard/products/new` | Cadastro de produto |
 | `/dashboard/products/[id]` | Edicao e desativacao de produto |
+| `/dashboard/scan` | Leitor de codigo de barras/QR pela camera (busca o produto e abre o cadastro) |
+
+Os graficos (Recharts) sao alimentados por uma agregacao feita no proprio Server Component,
+a partir das ultimas 50 vendas e movimentacoes retornadas pela API — sem endpoint de
+analytics dedicado. O leitor de codigo usa `html5-qrcode` num componente cliente (a
+biblioteca acessa a camera do navegador, entao so pode rodar depois da hidratacao) e
+resolve o codigo lido para um produto via busca por SKU/nome/codigo de barras
+(`GET /v1/products?search=`).
 
 ## Testes
 
@@ -161,7 +169,7 @@ npm run test:e2e --workspace=apps/api    # e2e
 - [x] Fornecedores e alertas de estoque minimo
 - [x] Fluxo de venda com emissao fiscal (NF-e)
 - [x] Frontend: autenticacao, layout protegido e gestao de produtos
-- [ ] Dashboard com graficos e leitura de codigo de barras/QR
+- [x] Dashboard com graficos e leitura de codigo de barras/QR
 - [ ] Revisao final de qualidade e seguranca
 
 ## Licenca

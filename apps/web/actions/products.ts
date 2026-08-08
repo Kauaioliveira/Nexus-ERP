@@ -71,3 +71,27 @@ export async function deactivateProductAction(productId: string): Promise<void> 
   revalidatePath('/dashboard/products');
   redirect('/dashboard/products');
 }
+
+export interface ScannedProduct {
+  id: string;
+  name: string;
+  sku: string;
+}
+
+// Chamada diretamente pelo componente cliente do leitor de codigo (nao
+// esta presa a um <form>): Server Actions podem ser invocadas como
+// funcoes normais a partir de handlers de evento no client.
+export async function lookupProductByCodeAction(code: string): Promise<ScannedProduct | null> {
+  const trimmed = code.trim();
+  if (!trimmed) return null;
+
+  try {
+    const result = await apiFetch<{ items: ScannedProduct[] }>(
+      `/products?search=${encodeURIComponent(trimmed)}&pageSize=1`,
+    );
+    const product = result.items[0];
+    return product ? { id: product.id, name: product.name, sku: product.sku } : null;
+  } catch {
+    return null;
+  }
+}

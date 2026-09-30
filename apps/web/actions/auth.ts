@@ -31,7 +31,7 @@ export async function loginAction(_prevState: ActionState, formData: FormData): 
       error:
         typeof body.message === 'string'
           ? body.message
-          : 'Nao foi possivel entrar. Verifique suas credenciais.',
+          : 'Não foi possível entrar. Verifique suas credenciais.',
     };
   }
 

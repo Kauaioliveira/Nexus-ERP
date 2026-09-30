@@ -14,7 +14,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-lg bg-brand-600 px-4 py-2.5 font-medium text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+      className="btn-primary w-full py-2.5"
     >
       {pending ? 'Entrando...' : 'Entrar'}
     </button>
@@ -36,7 +36,7 @@ export function LoginForm() {
           type="email"
           autoComplete="email"
           required
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+          className="input mt-1"
         />
       </div>
 
@@ -51,7 +51,7 @@ export function LoginForm() {
           autoComplete="current-password"
           required
           minLength={8}
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+          className="input mt-1"
         />
       </div>
 

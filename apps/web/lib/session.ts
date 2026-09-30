@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { apiFetch, ApiError } from './api';
 import { ACCESS_TOKEN_COOKIE } from './constants';
@@ -20,4 +21,13 @@ export async function getCurrentUser(): Promise<SafeUser | null> {
     }
     throw error;
   }
+}
+
+// Paginas restritas (financeiro, usuarios): a API ja bloqueia com 403, mas
+// o operador nem deveria chegar a tela.
+export async function requireAdmin(): Promise<SafeUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect('/login');
+  if (user.role !== 'ADMIN') redirect('/dashboard');
+  return user;
 }

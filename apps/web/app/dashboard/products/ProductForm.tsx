@@ -1,6 +1,7 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { ActionState, Category, Product, Supplier } from '@/lib/types';
 
 const initialState: ActionState = {};
@@ -69,7 +70,7 @@ interface ProductFormProps {
 }
 
 export function ProductForm({ action, product, categories, suppliers, submitLabel }: ProductFormProps) {
-  const [state, formAction] = useFormState(action, initialState);
+  const [state, formAction] = useActionState(action, initialState);
 
   return (
     <form action={formAction} className="grid gap-4 rounded-xl border border-slate-200 bg-white p-6 sm:grid-cols-2">

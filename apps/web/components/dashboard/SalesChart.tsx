@@ -19,7 +19,7 @@ export function SalesChart({ data }: { data: SalesChartPoint[] }) {
         <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#94a3b8" />
         <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" tickFormatter={(value: number) => `R$${value}`} />
         <Tooltip
-          formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Total']}
+          formatter={(value) => [`R$ ${Number(value).toFixed(2)}`, 'Total']}
           labelFormatter={(label) => `Dia ${label}`}
         />
         <Bar dataKey="total" fill="#2c4fc0" radius={[4, 4, 0, 0]} />

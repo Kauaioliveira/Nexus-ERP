@@ -14,7 +14,10 @@ describe('SalesService', () => {
     stockMovement: { create: jest.Mock };
     fiscalDocument: { create: jest.Mock };
   };
-  let prisma: { $transaction: jest.Mock; sale: { findUnique: jest.Mock; findMany: jest.Mock; count: jest.Mock } };
+  let prisma: {
+    $transaction: jest.Mock;
+    sale: { findUnique: jest.Mock; findMany: jest.Mock; count: jest.Mock };
+  };
   let fiscalService: { enqueueEmission: jest.Mock };
 
   const product = (overrides: Partial<Record<string, unknown>> = {}) => ({

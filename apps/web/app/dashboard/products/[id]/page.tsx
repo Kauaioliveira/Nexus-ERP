@@ -4,11 +4,12 @@ import { deactivateProductAction, updateProductAction } from '@/actions/products
 import { Category, PaginatedResponse, Product, Supplier } from '@/lib/types';
 import { ProductForm } from '../ProductForm';
 
-export default async function ProductDetailPage({ params }: { params: { id: string } }) {
+export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   let product: Product;
 
   try {
-    product = await apiFetch<Product>(`/products/${params.id}`);
+    product = await apiFetch<Product>(`/products/${id}`);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) notFound();
     throw error;

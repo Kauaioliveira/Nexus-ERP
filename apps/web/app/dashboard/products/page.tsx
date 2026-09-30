@@ -9,7 +9,8 @@ interface SearchParams {
   page?: string;
 }
 
-export default async function ProductsPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function ProductsPage(props: { searchParams: Promise<SearchParams> }) {
+  const searchParams = await props.searchParams;
   const page = Number(searchParams.page ?? '1') || 1;
   const params = new URLSearchParams();
   params.set('page', String(page));

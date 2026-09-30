@@ -15,10 +15,10 @@ export class ApiError extends Error {
 // Cliente HTTP para uso em Server Components e Server Actions. Le o
 // access token do cookie httpOnly e o envia como Bearer token para a API
 // NestJS. A renovacao do token (quando expirado) e responsabilidade do
-// middleware, que roda antes de qualquer Server Component ser renderizado
+// proxy (proxy.ts), que roda antes de qualquer Server Component ser renderizado
 // - por isso este helper nao tenta fazer refresh sozinho.
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const accessToken = cookies().get(ACCESS_TOKEN_COOKIE)?.value;
+  const accessToken = (await cookies()).get(ACCESS_TOKEN_COOKIE)?.value;
 
   const response = await fetch(`${process.env.API_URL}${path}`, {
     ...init,

@@ -44,10 +44,7 @@ describe('StockMovementsService', () => {
       tx.product.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.create(
-          { productId: 'missing', type: MovementType.ENTRADA, quantity: 5 },
-          'user-1',
-        ),
+        service.create({ productId: 'missing', type: MovementType.ENTRADA, quantity: 5 }, 'user-1'),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -86,7 +83,10 @@ describe('StockMovementsService', () => {
       tx.product.findUnique.mockResolvedValue(activeProduct(10));
       tx.stockMovement.create.mockResolvedValue({ id: 'mv-1' });
 
-      await service.create({ productId: 'prod-1', type: MovementType.SAIDA, quantity: 4 }, 'user-1');
+      await service.create(
+        { productId: 'prod-1', type: MovementType.SAIDA, quantity: 4 },
+        'user-1',
+      );
 
       expect(tx.product.update).toHaveBeenCalledWith({
         where: { id: 'prod-1' },
@@ -107,7 +107,10 @@ describe('StockMovementsService', () => {
       tx.product.findUnique.mockResolvedValue(activeProduct(10));
       tx.stockMovement.create.mockResolvedValue({ id: 'mv-1' });
 
-      await service.create({ productId: 'prod-1', type: MovementType.AJUSTE, quantity: 3 }, 'user-1');
+      await service.create(
+        { productId: 'prod-1', type: MovementType.AJUSTE, quantity: 3 },
+        'user-1',
+      );
 
       expect(tx.product.update).toHaveBeenCalledWith({
         where: { id: 'prod-1' },

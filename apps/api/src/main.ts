@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
@@ -23,8 +23,7 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3333;
   await app.listen(port);
-  // eslint-disable-next-line no-console
-  console.log(`Nexus ERP API rodando em http://localhost:${port}`);
+  new Logger('Bootstrap').log(`Nexus ERP API rodando em http://localhost:${port}`);
 }
 
 bootstrap();

@@ -25,7 +25,7 @@ async function tryRefresh(refreshToken: string): Promise<RefreshResponse | null>
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isProtected = pathname.startsWith(PROTECTED_PREFIX);
   const isLoginPage = pathname === '/login';
@@ -47,6 +47,12 @@ export async function middleware(request: NextRequest) {
 
     if (refreshed) {
       effectiveAccessToken = refreshed.accessToken;
+      // Repassa os tokens novos tambem na requisicao que segue para a
+      // pagina: sem isso, os Server Components desta mesma requisicao
+      // ainda leriam o access token expirado e a API responderia 401.
+      request.cookies.set(ACCESS_TOKEN_COOKIE, refreshed.accessToken);
+      request.cookies.set(REFRESH_TOKEN_COOKIE, refreshed.refreshToken);
+      response = NextResponse.next({ request: { headers: request.headers } });
       response.cookies.set(ACCESS_TOKEN_COOKIE, refreshed.accessToken, AUTH_COOKIE_OPTIONS);
       response.cookies.set(REFRESH_TOKEN_COOKIE, refreshed.refreshToken, AUTH_COOKIE_OPTIONS);
     } else {

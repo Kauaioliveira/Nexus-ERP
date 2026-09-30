@@ -22,7 +22,9 @@ import { SalesModule } from './modules/sales/sales.module';
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const redisUrl = new URL(configService.get<string>('REDIS_URL') ?? 'redis://localhost:6379');
+        const redisUrl = new URL(
+          configService.get<string>('REDIS_URL') ?? 'redis://localhost:6379',
+        );
         return {
           connection: {
             host: redisUrl.hostname,
@@ -45,9 +47,6 @@ import { SalesModule } from './modules/sales/sales.module';
     SalesModule,
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
-  ],
+  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

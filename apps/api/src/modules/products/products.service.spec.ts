@@ -69,9 +69,7 @@ describe('ProductsService', () => {
     it('throws NotFoundException when the product does not exist', async () => {
       prisma.product.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOneOrThrow('missing-id')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(service.findOneOrThrow('missing-id')).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('returns the product when found', async () => {

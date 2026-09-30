@@ -1,25 +1,11 @@
 import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
-import helmet from 'helmet';
+import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { configureApp } from './app.setup';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-
-  app.use(helmet());
-  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
-  app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',') ?? 'http://localhost:3000',
-    credentials: true,
-  });
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  const app = configureApp(await NestFactory.create(AppModule));
+  app.enableShutdownHooks();
 
   const port = process.env.PORT ?? 3333;
   await app.listen(port);

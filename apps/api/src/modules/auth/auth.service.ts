@@ -63,7 +63,7 @@ export class AuthService {
       include: { user: true },
     });
 
-    if (!stored || stored.revoked || stored.expiresAt < new Date()) {
+    if (!stored || stored.revoked || stored.expiresAt < new Date() || !stored.user.active) {
       throw new UnauthorizedException('Refresh token invalido ou expirado.');
     }
 

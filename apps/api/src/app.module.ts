@@ -14,6 +14,10 @@ import { StockMovementsModule } from './modules/stock-movements/stock-movements.
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { FiscalModule } from './modules/fiscal/fiscal.module';
 import { SalesModule } from './modules/sales/sales.module';
+import { CustomersModule } from './modules/customers/customers.module';
+import { FinancialModule } from './modules/financial/financial.module';
+import { PurchasesModule } from './modules/purchases/purchases.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -45,6 +49,10 @@ import { SalesModule } from './modules/sales/sales.module';
     SuppliersModule,
     FiscalModule,
     SalesModule,
+    CustomersModule,
+    PurchasesModule,
+    FinancialModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

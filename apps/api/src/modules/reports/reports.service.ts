@@ -41,6 +41,14 @@ interface StockRow {
   saleValue: Numeric;
 }
 
+function eachDay(from: string, to: string): string[] {
+  const days: string[] = [];
+  for (let day = from; day <= to; day = toLocalDay(addDays(localDayStart(day), 1))) {
+    days.push(day);
+  }
+  return days;
+}
+
 const money = (value: Numeric) => fromCents(toCents(Number(value ?? 0)));
 const int = (value: Numeric) => Number(value ?? 0);
 // Colunas guardam UTC sem fuso; parametros ISO sao convertidos para o
@@ -150,11 +158,12 @@ export class ReportsService {
               : 0,
         }),
       },
-      salesByDay: salesByDay.map((row) => ({
-        date: row.day,
-        total: money(row.total),
-        count: int(row.count),
-      })),
+      // Um ponto por dia do periodo, inclusive os sem venda (zero), para o
+      // grafico nao "pular" dias.
+      salesByDay: eachDay(from, to).map((date) => {
+        const row = salesByDay.find((item) => item.day === date);
+        return { date, total: money(row?.total ?? 0), count: int(row?.count ?? 0) };
+      }),
       topProducts: topProducts.map((row) => ({
         productId: row.productId,
         name: row.name,

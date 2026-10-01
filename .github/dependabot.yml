@@ -7,6 +7,17 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    # Versoes grandes que ainda nao dao para subir (revisar de tempos em tempos):
+    # - Prisma 7: exige migracao (prisma.config.ts, driver adapters) e hoje traz
+    #   vulnerabilidades altas via mysql2/deepmerge-ts.
+    # - ESLint 10: o eslint-plugin-react do eslint-config-next ainda nao suporta.
+    ignore:
+      - dependency-name: "prisma"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@prisma/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
     groups:
       # Pacotes que precisam subir juntos (versoes casadas) viram um PR so,
       # em vez de um PR por pacote que nunca passa no CI sozinho.

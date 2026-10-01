@@ -16,10 +16,9 @@ export class FiscalService {
   // transacao), para nao acoplar a disponibilidade do Redis a criacao da
   // venda em si.
   async enqueueEmission(saleId: string): Promise<void> {
-    await this.queue.add(
-      'emit',
-      { saleId } satisfies FiscalEmissionJobData,
-      { attempts: 3, backoff: { type: 'exponential', delay: 2_000 } },
-    );
+    await this.queue.add('emit', { saleId } satisfies FiscalEmissionJobData, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 2_000 },
+    });
   }
 }

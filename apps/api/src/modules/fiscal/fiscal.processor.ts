@@ -1,6 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
-import { FiscalStatus } from '@prisma/client';
+import { FiscalStatus, SaleStatus } from '@prisma/client';
 import { Job } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FiscalEmissionJobData } from './fiscal.service';
@@ -30,6 +30,16 @@ export class FiscalProcessor extends WorkerHost {
       // Venda nao existe mais (nao deveria acontecer) - descarta o job
       // sem tentar de novo.
       this.logger.warn(`Venda ${saleId} nao encontrada, descartando job de emissao fiscal.`);
+      return;
+    }
+
+    // Venda cancelada enquanto a NF-e ainda estava na fila: nao emite.
+    if (sale.status === SaleStatus.CANCELLED) {
+      this.logger.log(`Venda ${saleId} cancelada antes da emissao; NF-e nao sera emitida.`);
+      await this.prisma.fiscalDocument.update({
+        where: { saleId },
+        data: { status: FiscalStatus.NOT_REQUESTED, errorMessage: 'Venda cancelada.' },
+      });
       return;
     }
 

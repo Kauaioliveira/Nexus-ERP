@@ -11,7 +11,10 @@ describe('FiscalService', () => {
     queue = { add: jest.fn().mockResolvedValue({}) };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [FiscalService, { provide: getQueueToken(FISCAL_EMISSION_QUEUE), useValue: queue }],
+      providers: [
+        FiscalService,
+        { provide: getQueueToken(FISCAL_EMISSION_QUEUE), useValue: queue },
+      ],
     }).compile();
 
     service = module.get<FiscalService>(FiscalService);

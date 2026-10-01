@@ -37,3 +37,6 @@ Thumbs.db
 # Misc
 *.tsbuildinfo
 .turbo/
+
+# Redis local
+dump.rdb

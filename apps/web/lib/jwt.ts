@@ -1,5 +1,5 @@
 // Decodificacao "burra" (sem verificar assinatura) do payload de um JWT.
-// So usada para decidir, no middleware, se vale a pena tentar renovar o
+// So usada para decidir, no proxy, se vale a pena tentar renovar o
 // access token antes de deixar a requisicao seguir - a API sempre valida
 // a assinatura de verdade em cada chamada, entao isto nunca e um limite
 // de seguranca, apenas uma otimizacao de UX.

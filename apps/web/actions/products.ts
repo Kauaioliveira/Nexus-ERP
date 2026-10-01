@@ -63,7 +63,7 @@ export async function updateProductAction(
 
   revalidatePath('/dashboard/products');
   revalidatePath(`/dashboard/products/${productId}`);
-  return { error: undefined };
+  return { success: 'Alterações salvas.' };
 }
 
 export async function deactivateProductAction(productId: string): Promise<void> {

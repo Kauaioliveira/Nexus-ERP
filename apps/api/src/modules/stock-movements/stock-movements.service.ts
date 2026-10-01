@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { MovementType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
 import { ListStockMovementsQueryDto } from './dto/list-stock-movements-query.dto';
+import { applyStockDelta } from './stock-balance';
 
 @Injectable()
 export class StockMovementsService {
@@ -11,25 +12,12 @@ export class StockMovementsService {
   async create(dto: CreateStockMovementDto, userId: string) {
     const delta = this.resolveDelta(dto.type, dto.quantity);
 
-    // NOTA: para o volume de uma unica loja, uma transacao interativa e
-    // suficiente. Em um cenario de alta concorrencia sobre o mesmo produto,
-    // o ideal seria um SELECT ... FOR UPDATE (via $queryRaw) para evitar
-    // race conditions entre leitura e escrita do saldo.
     return this.prisma.$transaction(async (tx) => {
-      const product = await tx.product.findUnique({ where: { id: dto.productId } });
+      // Aplica o saldo antes de gravar a movimentacao: se o estoque for
+      // insuficiente (ou o produto nao existir), nada e persistido.
+      await applyStockDelta(tx, dto.productId, delta);
 
-      if (!product || !product.active) {
-        throw new NotFoundException('Produto nao encontrado.');
-      }
-
-      const newStock = product.currentStock + delta;
-      if (newStock < 0) {
-        throw new BadRequestException(
-          `Estoque insuficiente: saldo atual e ${product.currentStock}, movimentacao pede ${Math.abs(delta)}.`,
-        );
-      }
-
-      const movement = await tx.stockMovement.create({
+      return tx.stockMovement.create({
         data: {
           type: dto.type,
           quantity: dto.quantity,
@@ -39,13 +27,6 @@ export class StockMovementsService {
           userId,
         },
       });
-
-      await tx.product.update({
-        where: { id: dto.productId },
-        data: { currentStock: newStock },
-      });
-
-      return movement;
     });
   }
 

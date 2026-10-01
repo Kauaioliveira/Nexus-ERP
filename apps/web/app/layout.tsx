@@ -1,14 +1,18 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
 
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
+
 export const metadata: Metadata = {
-  title: 'Nexus ERP | Controle de Estoque',
-  description: 'Controle de estoque multiusuario com dashboards, leitura de codigo de barras e emissao fiscal integrada.',
+  title: { default: 'Nexus ERP', template: '%s | Nexus ERP' },
+  description:
+    'ERP para lojas: vendas (PDV), estoque, compras, clientes, financeiro e emissão fiscal.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className={inter.variable}>
       <body>{children}</body>
     </html>
   );

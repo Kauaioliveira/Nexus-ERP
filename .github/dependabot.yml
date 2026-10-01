@@ -1,20 +1,23 @@
 version: 2
 updates:
+  # Monorepo com npm workspaces: o package-lock.json unico fica na raiz,
+  # entao o Dependabot olha a raiz e atualiza apps/api e apps/web juntos.
   - package-ecosystem: "npm"
-    directory: "/apps/api"
+    directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     groups:
-      minor-and-patch:
-        update-types: ["minor", "patch"]
-
-  - package-ecosystem: "npm"
-    directory: "/apps/web"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    groups:
+      # Pacotes que precisam subir juntos (versoes casadas) viram um PR so,
+      # em vez de um PR por pacote que nunca passa no CI sozinho.
+      nestjs:
+        patterns: ["@nestjs/*"]
+      next-react:
+        patterns: ["next", "eslint-config-next", "react", "react-dom", "@types/react", "@types/react-dom"]
+      prisma:
+        patterns: ["prisma", "@prisma/*"]
+      lint:
+        patterns: ["eslint", "@eslint/*", "typescript-eslint", "eslint-*", "prettier", "globals"]
       minor-and-patch:
         update-types: ["minor", "patch"]
 
@@ -22,3 +25,6 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      actions:
+        patterns: ["*"]

@@ -31,20 +31,22 @@ export async function loginAction(_prevState: ActionState, formData: FormData): 
       error:
         typeof body.message === 'string'
           ? body.message
-          : 'Nao foi possivel entrar. Verifique suas credenciais.',
+          : 'Não foi possível entrar. Verifique suas credenciais.',
     };
   }
 
   const data = (await response.json()) as LoginResponse;
 
-  cookies().set(ACCESS_TOKEN_COOKIE, data.accessToken, AUTH_COOKIE_OPTIONS);
-  cookies().set(REFRESH_TOKEN_COOKIE, data.refreshToken, AUTH_COOKIE_OPTIONS);
+  const cookieStore = await cookies();
+  cookieStore.set(ACCESS_TOKEN_COOKIE, data.accessToken, AUTH_COOKIE_OPTIONS);
+  cookieStore.set(REFRESH_TOKEN_COOKIE, data.refreshToken, AUTH_COOKIE_OPTIONS);
 
   redirect('/dashboard');
 }
 
 export async function logoutAction(): Promise<void> {
-  const refreshToken = cookies().get(REFRESH_TOKEN_COOKIE)?.value;
+  const cookieStore = await cookies();
+  const refreshToken = cookieStore.get(REFRESH_TOKEN_COOKIE)?.value;
 
   if (refreshToken) {
     await fetch(`${process.env.API_URL}/auth/logout`, {
@@ -55,7 +57,7 @@ export async function logoutAction(): Promise<void> {
     }).catch(() => undefined);
   }
 
-  cookies().delete(ACCESS_TOKEN_COOKIE);
-  cookies().delete(REFRESH_TOKEN_COOKIE);
+  cookieStore.delete(ACCESS_TOKEN_COOKIE);
+  cookieStore.delete(REFRESH_TOKEN_COOKIE);
   redirect('/login');
 }

@@ -1,5 +1,6 @@
 // Nexus ERP - schema de dados
-// Dominio: controle de estoque multiusuario para uma loja, com emissao fiscal integrada.
+// Dominio: ERP para uma loja - estoque, vendas (PDV), compras, clientes,
+// fornecedores, financeiro (contas a pagar/receber) e emissao fiscal.
 
 generator client {
   provider = "prisma-client-js"
@@ -27,6 +28,34 @@ enum SaleStatus {
   CANCELLED
 }
 
+// Formas de pagamento aceitas no PDV. DINHEIRO, PIX e cartoes geram o
+// recebimento ja quitado; BOLETO e A_PRAZO geram contas a receber em aberto.
+enum PaymentMethod {
+  DINHEIRO
+  PIX
+  CARTAO_DEBITO
+  CARTAO_CREDITO
+  BOLETO
+  A_PRAZO
+}
+
+enum PurchaseOrderStatus {
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+enum FinancialEntryType {
+  RECEIVABLE
+  PAYABLE
+}
+
+enum FinancialEntryStatus {
+  OPEN
+  PAID
+  CANCELLED
+}
+
 enum FiscalStatus {
   NOT_REQUESTED
   QUEUED
@@ -45,9 +74,11 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  stockMovements StockMovement[]
-  sales          Sale[]
-  refreshTokens  RefreshToken[]
+  stockMovements   StockMovement[]
+  sales            Sale[]
+  refreshTokens    RefreshToken[]
+  purchaseOrders   PurchaseOrder[]
+  financialEntries FinancialEntry[]
 
   @@map("users")
 }
@@ -82,23 +113,44 @@ model Supplier {
   createdAt DateTime  @default(now())
   products  Product[]
 
+  purchaseOrders   PurchaseOrder[]
+  financialEntries FinancialEntry[]
+
   @@map("suppliers")
 }
 
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  document  String?  @unique // CPF/CNPJ
+  email     String?
+  phone     String?
+  address   String?
+  notes     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sales            Sale[]
+  financialEntries FinancialEntry[]
+
+  @@map("customers")
+}
+
 model Product {
-  id          String   @id @default(uuid())
-  sku         String   @unique
-  barcode     String?  @unique
-  name        String
-  description String?
-  unit        String   @default("UN") // UN, KG, CX, etc.
-  costPrice   Decimal  @db.Decimal(12, 2)
-  salePrice   Decimal  @db.Decimal(12, 2)
-  minStock    Int      @default(0)
-  currentStock Int     @default(0)
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  sku          String   @unique
+  barcode      String?  @unique
+  name         String
+  description  String?
+  unit         String   @default("UN") // UN, KG, CX, etc.
+  costPrice    Decimal  @db.Decimal(12, 2)
+  salePrice    Decimal  @db.Decimal(12, 2)
+  minStock     Int      @default(0)
+  currentStock Int      @default(0)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
@@ -106,8 +158,9 @@ model Product {
   supplierId String?
   supplier   Supplier? @relation(fields: [supplierId], references: [id])
 
-  stockMovements StockMovement[]
-  saleItems      SaleItem[]
+  stockMovements     StockMovement[]
+  saleItems          SaleItem[]
+  purchaseOrderItems PurchaseOrderItem[]
 
   @@index([categoryId])
   @@index([supplierId])
@@ -134,18 +187,31 @@ model StockMovement {
 }
 
 model Sale {
-  id        String     @id @default(uuid())
-  status    SaleStatus @default(PENDING)
-  total     Decimal    @db.Decimal(12, 2)
-  createdAt DateTime   @default(now())
+  id            String        @id @default(uuid())
+  // Numero sequencial legivel ("Venda #123"), usado na tela e nos recibos.
+  number        Int           @unique @default(autoincrement())
+  status        SaleStatus    @default(PENDING)
+  paymentMethod PaymentMethod @default(DINHEIRO)
+  subtotal      Decimal       @db.Decimal(12, 2)
+  discount      Decimal       @default(0) @db.Decimal(12, 2)
+  total         Decimal       @db.Decimal(12, 2)
+  notes         String?
+  cancelledAt   DateTime?
+  cancelReason  String?
+  createdAt     DateTime      @default(now())
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
-  items          SaleItem[]
-  fiscalDocument FiscalDocument?
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  items            SaleItem[]
+  fiscalDocument   FiscalDocument?
+  financialEntries FinancialEntry[]
 
   @@index([createdAt])
+  @@index([customerId])
   @@map("sales")
 }
 
@@ -153,6 +219,9 @@ model SaleItem {
   id        String  @id @default(uuid())
   quantity  Int
   unitPrice Decimal @db.Decimal(12, 2)
+  // Custo do produto no momento da venda: permite calcular a margem real
+  // mesmo que o custo mude depois.
+  unitCost  Decimal @default(0) @db.Decimal(12, 2)
 
   saleId String
   sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
@@ -161,6 +230,88 @@ model SaleItem {
   product   Product @relation(fields: [productId], references: [id])
 
   @@map("sale_items")
+}
+
+// Pedido de compra a um fornecedor. Ao ser recebido, gera as entradas de
+// estoque (atualizando o custo medio dos produtos) e as contas a pagar.
+model PurchaseOrder {
+  id         String              @id @default(uuid())
+  number     Int                 @unique @default(autoincrement())
+  status     PurchaseOrderStatus @default(ORDERED)
+  total      Decimal             @db.Decimal(12, 2)
+  expectedAt DateTime?
+  receivedAt DateTime?
+  notes      String?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  items            PurchaseOrderItem[]
+  financialEntries FinancialEntry[]
+
+  @@index([status])
+  @@index([supplierId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id       String  @id @default(uuid())
+  quantity Int
+  unitCost Decimal @db.Decimal(12, 2)
+
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("purchase_order_items")
+}
+
+// Lancamento financeiro: uma conta a receber (RECEIVABLE) ou a pagar
+// (PAYABLE). Vendas e compras geram lancamentos automaticamente; despesas
+// avulsas (aluguel, energia, etc) sao lancadas manualmente.
+model FinancialEntry {
+  id            String               @id @default(uuid())
+  type          FinancialEntryType
+  status        FinancialEntryStatus @default(OPEN)
+  description   String
+  category      String?
+  amount        Decimal              @db.Decimal(12, 2)
+  dueDate       DateTime
+  paidAt        DateTime?
+  paymentMethod PaymentMethod?
+  installment   Int                  @default(1)
+  installments  Int                  @default(1)
+  notes         String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  saleId String?
+  sale   Sale?   @relation(fields: [saleId], references: [id])
+
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([type, status, dueDate])
+  @@index([paidAt])
+  @@index([saleId])
+  @@index([purchaseOrderId])
+  @@map("financial_entries")
 }
 
 // Abstracao para provedor fiscal (Focus NFe, PlugNotas, NFe.io, etc).

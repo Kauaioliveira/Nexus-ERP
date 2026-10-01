@@ -1,14 +1,16 @@
+import type { Metadata } from 'next';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { BarcodeScanner } from '@/components/scan/BarcodeScanner';
+
+export const metadata: Metadata = { title: 'Leitor de código' };
 
 export default function ScanPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Leitor de codigo</h1>
-        <p className="text-sm text-slate-500">
-          Aponte a camera para o codigo de barras ou QR code do produto para abrir o cadastro rapidamente.
-        </p>
-      </div>
+      <PageHeader
+        title="Leitor de código"
+        description="Aponte a câmera para o código de barras ou QR code do produto para abrir o cadastro. Para vender, use o PDV: um leitor USB funciona direto no campo de busca."
+      />
       <BarcodeScanner />
     </div>
   );

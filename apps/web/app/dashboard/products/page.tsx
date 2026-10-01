@@ -1,6 +1,10 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { apiFetch } from '@/lib/api';
 import { Category, PaginatedResponse, Product } from '@/lib/types';
+
+export const metadata: Metadata = { title: 'Produtos' };
 
 interface SearchParams {
   search?: string;
@@ -9,7 +13,8 @@ interface SearchParams {
   page?: string;
 }
 
-export default async function ProductsPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function ProductsPage(props: { searchParams: Promise<SearchParams> }) {
+  const searchParams = await props.searchParams;
   const page = Number(searchParams.page ?? '1') || 1;
   const params = new URLSearchParams();
   params.set('page', String(page));
@@ -27,31 +32,28 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Produtos</h1>
-          <p className="text-sm text-slate-500">{productsPage.total} produto(s) encontrado(s)</p>
-        </div>
-        <Link
-          href="/dashboard/products/new"
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-        >
-          Novo produto
-        </Link>
-      </div>
+      <PageHeader
+        title="Produtos"
+        description={`${productsPage.total} produto(s) encontrado(s)`}
+        actions={
+          <Link href="/dashboard/products/new" className="btn-primary">
+            Novo produto
+          </Link>
+        }
+      />
 
-      <form method="GET" className="flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-white p-4">
+      <form method="GET" className="card flex flex-wrap gap-3 p-4">
         <div className="min-w-[240px] flex-1">
           <label htmlFor="search" className="sr-only">
-            Buscar por nome, SKU ou codigo de barras
+            Buscar por nome, SKU ou código de barras
           </label>
           <input
             id="search"
             type="search"
             name="search"
-            placeholder="Buscar por nome, SKU ou codigo de barras"
+            placeholder="Buscar por nome, SKU ou código de barras"
             defaultValue={searchParams.search}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="input"
           />
         </div>
         <div>
@@ -62,7 +64,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
             id="categoryId"
             name="categoryId"
             defaultValue={searchParams.categoryId ?? ''}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="input"
           >
             <option value="">Todas as categorias</option>
             {categories.map((category) => (
@@ -80,27 +82,27 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
             id="active"
             name="active"
             defaultValue={searchParams.active ?? ''}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="input"
           >
             <option value="">Ativos e inativos</option>
             <option value="true">Somente ativos</option>
             <option value="false">Somente inativos</option>
           </select>
         </div>
-        <button type="submit" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        <button type="submit" className="btn-secondary">
           Filtrar
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="card overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="table-head">
             <tr>
               <th scope="col" className="px-4 py-3">SKU</th>
               <th scope="col" className="px-4 py-3">Nome</th>
               <th scope="col" className="px-4 py-3">Categoria</th>
               <th scope="col" className="px-4 py-3 text-right">Estoque</th>
-              <th scope="col" className="px-4 py-3 text-right">Preco</th>
+              <th scope="col" className="px-4 py-3 text-right">Preço</th>
               <th scope="col" className="px-4 py-3">Status</th>
             </tr>
           </thead>

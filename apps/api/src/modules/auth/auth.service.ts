@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -45,7 +45,13 @@ export class AuthService {
 
     return {
       ...tokens,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role, active: user.active },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        active: user.active,
+      },
     };
   }
 
@@ -57,7 +63,7 @@ export class AuthService {
       include: { user: true },
     });
 
-    if (!stored || stored.revoked || stored.expiresAt < new Date()) {
+    if (!stored || stored.revoked || stored.expiresAt < new Date() || !stored.user.active) {
       throw new UnauthorizedException('Refresh token invalido ou expirado.');
     }
 
@@ -83,7 +89,8 @@ export class AuthService {
       { sub: userId, email, role },
       {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRES_IN') ?? '15m',
+        expiresIn: (this.configService.get<string>('JWT_ACCESS_EXPIRES_IN') ??
+          '15m') as JwtSignOptions['expiresIn'],
       },
     );
 
@@ -113,7 +120,9 @@ export class AuthService {
     }
 
     const value = Number(match[1]);
-    const unitMs = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 }[match[2] as 's' | 'm' | 'h' | 'd'];
+    const unitMs = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 }[
+      match[2] as 's' | 'm' | 'h' | 'd'
+    ];
     return value * unitMs;
   }
 }

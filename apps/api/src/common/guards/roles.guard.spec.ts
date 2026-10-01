@@ -15,7 +15,9 @@ function buildContext(user?: { role: Role }): ExecutionContext {
 
 describe('RolesGuard', () => {
   it('allows access when the route has no @Roles metadata', () => {
-    const reflector = { getAllAndOverride: jest.fn().mockReturnValue(undefined) } as unknown as Reflector;
+    const reflector = {
+      getAllAndOverride: jest.fn().mockReturnValue(undefined),
+    } as unknown as Reflector;
     const guard = new RolesGuard(reflector);
 
     expect(guard.canActivate(buildContext({ role: Role.OPERATOR }))).toBe(true);

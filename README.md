@@ -306,6 +306,9 @@ baixa → cancelamento → relatorio) num banco real. Rode-os num banco descarta
 - CI roda typecheck, lint, testes unitarios (com cobertura), migracoes + testes e2e contra
   Postgres/Redis reais, build de api e web, build das imagens Docker e `npm audit` (falha
   com vulnerabilidade alta ou critica em dependencias de producao).
+- Scripts de instalação aprovados explicitamente em `allowScripts` (`package.json`): o npm
+  12+ bloqueia os demais. Um job do CI instala com npm 12 e Node 24 e falha se alguma
+  dependência nova precisar de aprovação, ou se o Prisma Client/argon2 não ficarem prontos.
 - Dependabot semanal com PRs agrupados (Nest, Next/React, Prisma, lint, minor/patch), para
   que pacotes que precisam subir juntos cheguem num PR so.
 - Auditoria de acessibilidade (WCAG 2.1 AA) aplicada ao frontend: labels em todos os campos

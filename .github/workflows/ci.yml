@@ -79,6 +79,28 @@ jobs:
       # Falha o CI se entrar dependencia de producao com vulnerabilidade alta ou critica.
       - run: npm audit --omit=dev --audit-level=high
 
+  # npm 12+ bloqueia scripts de instalacao de dependencias que nao estejam em
+  # "allowScripts" (package.json). Sem eles o Prisma Client nao e gerado e
+  # modulos nativos (argon2) podem nao compilar. Este job instala como uma
+  # maquina nova com npm atual e falha se alguma dependencia nova precisar
+  # de aprovacao, para o problema aparecer aqui e nao no cliente.
+  install-npm-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npx --yes npm@12 ci
+      - name: Nenhum script de instalacao pendente de aprovacao
+        run: |
+          npx --yes npm@12 approve-scripts --allow-scripts-pending | tee pending.txt
+          grep -q "No packages with unreviewed install scripts" pending.txt
+      - name: Prisma Client gerado e argon2 carregando
+        run: |
+          test -f node_modules/.prisma/client/index.js
+          node -e "require('argon2').hash('ci').then(() => console.log('argon2 ok'))"
+
   docker:
     runs-on: ubuntu-latest
     steps:

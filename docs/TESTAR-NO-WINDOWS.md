@@ -108,6 +108,12 @@ PlugNotas ou NFe.io) ligado ao `FiscalProvider` da API.
 
 ## Problemas comuns
 
+- **npm avisa "install scripts blocked"**: o npm 12 ou mais novo só roda scripts de
+  instalação das dependências aprovadas em `allowScripts` no `package.json`. O projeto já
+  aprova as que precisa (Prisma, argon2 e mais quatro). Se aparecer, você está numa versão
+  antiga do código: rode `git pull` e `npm install` de novo. Não use
+  `npm approve-scripts --all` sem revisar.
+
 - **`npm run build` do site falha**: confira se não há `NODE_ENV` definido nas variáveis
   de ambiente do Windows (com `NODE_ENV=development` o build do Next quebra).
 - **Porta 5432 ocupada**: já existe um PostgreSQL instalado. Pare o serviço dele ou mude a

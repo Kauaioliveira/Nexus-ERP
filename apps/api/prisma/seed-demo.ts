@@ -1,6 +1,6 @@
 import { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { PaymentMethod, PrismaClient, Role } from '@prisma/client';
+import { FiscalModel, PaymentMethod, PrismaClient, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { AppModule } from '../src/app.module';
 import { CustomersService } from '../src/modules/customers/customers.service';
@@ -87,28 +87,31 @@ async function populate(app: INestApplicationContext, adminId: string) {
     prisma.supplier.create({ data: { name: 'Atacado Modelo', email: 'contato@atacado.example' } }),
   ]);
 
+  // NCM real de cada tipo de produto (exigido na NF-e/NFC-e) e GTIN-13
+  // ficticio com prefixo 789 e digito verificador valido.
   const catalog = [
-    ['MER-001', 'Arroz 5kg', mercearia.id, distribuidora.id, 22.5, 32.9, 10],
-    ['MER-002', 'Feijão carioca 1kg', mercearia.id, distribuidora.id, 6.2, 9.49, 15],
-    ['MER-003', 'Café torrado 500g', mercearia.id, distribuidora.id, 12.9, 19.9, 12],
-    ['MER-004', 'Açúcar refinado 1kg', mercearia.id, distribuidora.id, 3.8, 5.79, 15],
-    ['MER-005', 'Óleo de soja 900ml', mercearia.id, atacado.id, 5.9, 8.99, 12],
-    ['BEB-001', 'Refrigerante 2L', bebidas.id, atacado.id, 5.5, 9.99, 20],
-    ['BEB-002', 'Suco integral 1L', bebidas.id, atacado.id, 6.8, 11.9, 8],
-    ['BEB-003', 'Água mineral 1,5L', bebidas.id, atacado.id, 1.2, 3.5, 24],
-    ['LIM-001', 'Detergente 500ml', limpeza.id, atacado.id, 1.9, 3.49, 20],
-    ['LIM-002', 'Sabão em pó 1kg', limpeza.id, atacado.id, 9.5, 15.9, 10],
+    ['MER-001', 'Arroz 5kg', mercearia.id, distribuidora.id, 22.5, 32.9, 10, '10063021'],
+    ['MER-002', 'Feijão carioca 1kg', mercearia.id, distribuidora.id, 6.2, 9.49, 15, '07133319'],
+    ['MER-003', 'Café torrado 500g', mercearia.id, distribuidora.id, 12.9, 19.9, 12, '09012100'],
+    ['MER-004', 'Açúcar refinado 1kg', mercearia.id, distribuidora.id, 3.8, 5.79, 15, '17019900'],
+    ['MER-005', 'Óleo de soja 900ml', mercearia.id, atacado.id, 5.9, 8.99, 12, '15079011'],
+    ['BEB-001', 'Refrigerante 2L', bebidas.id, atacado.id, 5.5, 9.99, 20, '22021000'],
+    ['BEB-002', 'Suco integral 1L', bebidas.id, atacado.id, 6.8, 11.9, 8, '20098990'],
+    ['BEB-003', 'Água mineral 1,5L', bebidas.id, atacado.id, 1.2, 3.5, 24, '22011000'],
+    ['LIM-001', 'Detergente 500ml', limpeza.id, atacado.id, 1.9, 3.49, 20, '34022000'],
+    ['LIM-002', 'Sabão em pó 1kg', limpeza.id, atacado.id, 9.5, 15.9, 10, '34022000'],
   ] as const;
 
   const products = [];
-  for (const [sku, name, categoryId, supplierId, costPrice, salePrice, minStock] of catalog) {
+  for (const [sku, name, categoryId, supplierId, costPrice, salePrice, minStock, ncm] of catalog) {
     products.push(
       await prisma.product.create({
         data: {
           sku,
-          barcode: `78900000${String(products.length + 1).padStart(5, '0')}`,
+          barcode: demoGtin(products.length + 1),
           name,
           unit: 'UN',
+          ncm,
           costPrice,
           salePrice,
           minStock,
@@ -141,13 +144,34 @@ async function populate(app: INestApplicationContext, adminId: string) {
     adminId,
   );
 
+  // Documentos ficticios com digito verificador valido (usados em testes).
+  const address = {
+    zipCode: '01310100',
+    street: 'Avenida Paulista',
+    district: 'Bela Vista',
+    city: 'São Paulo',
+    cityCode: '3550308',
+    state: 'SP',
+  };
   const customers = [];
-  for (const [name, phone] of [
-    ['Maria Exemplo', '(11) 90000-0001'],
-    ['João Modelo', '(11) 90000-0002'],
-    ['Padaria Fictícia', '(11) 90000-0003'],
+  for (const data of [
+    {
+      name: 'Maria Exemplo',
+      phone: '(11) 90000-0001',
+      document: '52998224725',
+      ...address,
+      number: '1000',
+    },
+    { name: 'João Modelo', phone: '(11) 90000-0002' },
+    {
+      name: 'Padaria Fictícia',
+      phone: '(11) 90000-0003',
+      document: '11444777000161',
+      ...address,
+      number: '2000',
+    },
   ]) {
-    const customer = await customersService.create({ name, phone });
+    const customer = await customersService.create(data);
     if (customer) customers.push(customer);
   }
 
@@ -193,6 +217,21 @@ async function populate(app: INestApplicationContext, adminId: string) {
     }
   }
 
+  // Uma venda com NF-e (cliente com CNPJ e endereco) para ver o DANFE A4.
+  await sales.create(
+    {
+      items: [
+        { productId: products[0].id, quantity: 2 },
+        { productId: products[2].id, quantity: 3 },
+      ],
+      paymentMethod: PaymentMethod.BOLETO,
+      customerId: customers[2].id,
+      installments: 1,
+      fiscalModel: FiscalModel.NFE,
+    },
+    adminId,
+  );
+
   // Despesas fixas do mes.
   const monthDay = (day: number) => {
     const now = new Date();
@@ -230,6 +269,13 @@ async function populate(app: INestApplicationContext, adminId: string) {
     },
     adminId,
   );
+}
+
+// GTIN-13 ficticio: 789 + 9 digitos + digito verificador (modulo 10).
+function demoGtin(n: number): string {
+  const base = `789${String(n).padStart(9, '0')}`;
+  const sum = [...base].reduce((acc, digit, i) => acc + Number(digit) * (i % 2 === 0 ? 1 : 3), 0);
+  return base + String((10 - (sum % 10)) % 10);
 }
 
 main()

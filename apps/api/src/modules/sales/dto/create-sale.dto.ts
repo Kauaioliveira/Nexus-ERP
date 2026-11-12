@@ -1,4 +1,4 @@
-import { PaymentMethod } from '@prisma/client';
+import { FiscalModel, PaymentMethod } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -63,4 +63,15 @@ export class CreateSaleDto {
   @IsString()
   @MaxLength(1000)
   notes?: string;
+
+  // NFC-e (padrao, cupom do PDV) ou NF-e (exige cliente com endereco).
+  @IsOptional()
+  @IsEnum(FiscalModel)
+  fiscalModel?: FiscalModel;
+
+  // "CPF na nota" da NFC-e.
+  @IsOptional()
+  @IsString()
+  @MaxLength(18)
+  buyerDocument?: string;
 }

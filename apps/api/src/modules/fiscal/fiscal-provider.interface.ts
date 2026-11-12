@@ -1,25 +1,41 @@
-// Abstracao sobre o provedor de emissao fiscal (NF-e). O restante do
-// sistema so conhece esta interface; trocar de provedor (Focus NFe,
-// PlugNotas, NFe.io) ou de modo (sandbox/producao) e uma questao de
-// implementar um novo adapter, sem tocar em SalesService ou no worker.
-export interface FiscalEmissionItem {
-  productName: string;
-  quantity: number;
-  unitPrice: number;
+import { NfeData, SefazResult } from './nfe/nfe-types';
+
+// Abstracao sobre quem autoriza a nota. O restante do sistema monta a
+// nota (dados + XML 4.00) e so conhece esta interface; trocar a SEFAZ
+// simulada por um provedor real (Focus NFe, PlugNotas, NFe.io) ou pela
+// SEFAZ direto e implementar um novo adapter.
+
+export interface FiscalAuthorizationRequest {
+  data: NfeData;
+  xml: string;
+  // Liga a indisponibilidade simulada (so a SEFAZ simulada respeita).
+  simulateOffline?: boolean;
 }
 
-export interface FiscalEmissionInput {
-  saleId: string;
-  total: number;
-  items: FiscalEmissionItem[];
-}
-
-export interface FiscalEmissionResult {
-  externalId: string;
-  xmlUrl?: string;
-  pdfUrl?: string;
+export interface FiscalCancelRequest {
+  model: 55 | 65;
+  accessKey: string;
+  cnpj: string;
+  environment: number;
+  authorizationProtocol: string;
+  authorizedAt: Date;
+  reason: string;
+  simulateOffline?: boolean;
 }
 
 export interface FiscalProvider {
-  emit(input: FiscalEmissionInput): Promise<FiscalEmissionResult>;
+  readonly name: string;
+  // Devolve cStat 100 (autorizada) ou uma rejeicao. Lanca
+  // FiscalUnavailableError quando nao ha comunicacao.
+  authorize(request: FiscalAuthorizationRequest): Promise<SefazResult>;
+  // Devolve cStat 135 (evento registrado) ou uma rejeicao.
+  cancel(request: FiscalCancelRequest): Promise<SefazResult>;
+}
+
+export class FiscalUnavailableError extends Error {
+  readonly statusCode = 108;
+  constructor(message = 'Serviço Paralisado Momentaneamente (curto prazo)') {
+    super(message);
+    this.name = 'FiscalUnavailableError';
+  }
 }

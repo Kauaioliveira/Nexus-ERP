@@ -15,7 +15,9 @@ export const fiscalProviderFactory = {
     switch (provider) {
       case 'sandbox':
       default:
-        return new SandboxFiscalProvider();
+        return new SandboxFiscalProvider(
+          Number(configService.get<string>('FISCAL_SANDBOX_LATENCY_MS') ?? 300),
+        );
     }
   },
   inject: [ConfigService],

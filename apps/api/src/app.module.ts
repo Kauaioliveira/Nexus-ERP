@@ -18,6 +18,7 @@ import { CustomersModule } from './modules/customers/customers.module';
 import { FinancialModule } from './modules/financial/financial.module';
 import { PurchasesModule } from './modules/purchases/purchases.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { CompanyModule } from './modules/company/company.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     ProductsModule,
     StockMovementsModule,
     SuppliersModule,
+    CompanyModule,
     FiscalModule,
     SalesModule,
     CustomersModule,

@@ -1,85 +1,15 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Inject, Logger } from '@nestjs/common';
-import { FiscalStatus, SaleStatus } from '@prisma/client';
 import { Job } from 'bullmq';
-import { PrismaService } from '../../prisma/prisma.service';
-import { FiscalEmissionJobData } from './fiscal.service';
-import { FiscalProvider } from './fiscal-provider.interface';
-import { FISCAL_EMISSION_QUEUE, FISCAL_PROVIDER } from './fiscal.constants';
+import { FISCAL_EMISSION_QUEUE } from './fiscal.constants';
+import { FiscalEmissionJobData, FiscalService } from './fiscal.service';
 
 @Processor(FISCAL_EMISSION_QUEUE)
 export class FiscalProcessor extends WorkerHost {
-  private readonly logger = new Logger(FiscalProcessor.name);
-
-  constructor(
-    private readonly prisma: PrismaService,
-    @Inject(FISCAL_PROVIDER) private readonly fiscalProvider: FiscalProvider,
-  ) {
+  constructor(private readonly fiscalService: FiscalService) {
     super();
   }
 
   async process(job: Job<FiscalEmissionJobData>): Promise<void> {
-    const { saleId } = job.data;
-
-    const sale = await this.prisma.sale.findUnique({
-      where: { id: saleId },
-      include: { items: { include: { product: true } } },
-    });
-
-    if (!sale) {
-      // Venda nao existe mais (nao deveria acontecer) - descarta o job
-      // sem tentar de novo.
-      this.logger.warn(`Venda ${saleId} nao encontrada, descartando job de emissao fiscal.`);
-      return;
-    }
-
-    // Venda cancelada enquanto a NF-e ainda estava na fila: nao emite.
-    if (sale.status === SaleStatus.CANCELLED) {
-      this.logger.log(`Venda ${saleId} cancelada antes da emissao; NF-e nao sera emitida.`);
-      await this.prisma.fiscalDocument.update({
-        where: { saleId },
-        data: { status: FiscalStatus.NOT_REQUESTED, errorMessage: 'Venda cancelada.' },
-      });
-      return;
-    }
-
-    await this.prisma.fiscalDocument.update({
-      where: { saleId },
-      data: { status: FiscalStatus.PROCESSING },
-    });
-
-    try {
-      const result = await this.fiscalProvider.emit({
-        saleId,
-        total: Number(sale.total),
-        items: sale.items.map((item) => ({
-          productName: item.product.name,
-          quantity: item.quantity,
-          unitPrice: Number(item.unitPrice),
-        })),
-      });
-
-      await this.prisma.fiscalDocument.update({
-        where: { saleId },
-        data: {
-          status: FiscalStatus.ISSUED,
-          externalId: result.externalId,
-          xmlUrl: result.xmlUrl,
-          pdfUrl: result.pdfUrl,
-          errorMessage: null,
-        },
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro desconhecido';
-
-      await this.prisma.fiscalDocument.update({
-        where: { saleId },
-        data: { status: FiscalStatus.FAILED, errorMessage: message },
-      });
-
-      // Relanca para que o BullMQ conte como falha e aplique o retry
-      // configurado (3 tentativas, backoff exponencial).
-      throw error;
-    }
+    await this.fiscalService.processEmission(job.data.saleId);
   }
 }

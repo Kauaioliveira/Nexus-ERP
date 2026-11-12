@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ListProductsQueryDto } from './dto/list-products-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { BarcodeLookupService } from './barcode-lookup.service';
 import { ProductsService } from './products.service';
 
 // Leitura liberada para ADMIN e OPERATOR (qualquer usuario autenticado);
@@ -26,7 +27,10 @@ import { ProductsService } from './products.service';
 @Controller({ path: 'products', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly barcodeLookup: BarcodeLookupService,
+  ) {}
 
   @Post()
   @Roles(Role.ADMIN)
@@ -43,6 +47,12 @@ export class ProductsController {
   @Get('low-stock')
   findLowStock() {
     return this.productsService.findLowStock();
+  }
+
+  // Leitor de codigo de barras (PDV, cadastro, estoque).
+  @Get('barcode/:code')
+  lookupBarcode(@Param('code') code: string) {
+    return this.barcodeLookup.lookup(code);
   }
 
   @Get(':id')

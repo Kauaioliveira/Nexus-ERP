@@ -39,6 +39,7 @@ jobs:
       JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
       FISCAL_PROVIDER: sandbox
+      BARCODE_LOOKUP: 'off'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

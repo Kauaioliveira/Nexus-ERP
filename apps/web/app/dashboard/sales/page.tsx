@@ -134,7 +134,7 @@ export default async function SalesPage(props: { searchParams: Promise<SearchPar
                   <div className="flex flex-wrap gap-1">
                     <SaleStatusBadge status={sale.status} />
                     {sale.status === 'COMPLETED' && sale.fiscalDocument && (
-                      <FiscalStatusBadge status={sale.fiscalDocument.status} />
+                      <FiscalStatusBadge status={sale.fiscalDocument.status} model={sale.fiscalDocument.model} />
                     )}
                   </div>
                 </td>

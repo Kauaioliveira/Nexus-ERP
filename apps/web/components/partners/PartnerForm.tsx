@@ -5,8 +5,9 @@ import { Field, TextArea } from '@/components/ui/Field';
 import { FormMessage } from '@/components/ui/FormMessage';
 import { SubmitButton } from '@/components/ui/SubmitButton';
 import type { ActionState } from '@/lib/types';
+import { AddressFields, type AddressValues } from '@/components/address/AddressFields';
 
-interface PartnerValues {
+interface PartnerValues extends AddressValues {
   name?: string;
   document?: string | null;
   email?: string | null;
@@ -42,6 +43,8 @@ export function PartnerForm({
         label={kind === 'customer' ? 'CPF/CNPJ' : 'CNPJ/CPF'}
         name="document"
         defaultValue={values?.document ?? ''}
+        inputMode="numeric"
+        hint={kind === 'customer' ? 'Validado pelo dígito verificador. Obrigatório para NF-e.' : undefined}
       />
       <Field label="Telefone" name="phone" type="tel" defaultValue={values?.phone ?? ''} />
       <Field
@@ -53,10 +56,13 @@ export function PartnerForm({
       />
       {kind === 'customer' && (
         <>
+          <AddressFields values={values} />
           <Field
-            label="Endereço"
+            label="Complemento"
             name="address"
             defaultValue={values?.address ?? ''}
+            maxLength={60}
+            placeholder="Apto, bloco, referência"
             className="sm:col-span-2"
           />
           <TextArea

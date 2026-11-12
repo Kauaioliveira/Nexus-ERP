@@ -8,6 +8,7 @@ import type {
   ActionState,
   Customer,
   PaginatedResponse,
+  FiscalModel,
   PaymentMethod,
   Product,
   SaleDetail,
@@ -66,6 +67,8 @@ export interface CreateSaleInput {
   installments?: number;
   firstDueDate?: string;
   notes?: string;
+  fiscalModel?: FiscalModel;
+  buyerDocument?: string;
 }
 
 export async function createSaleAction(input: CreateSaleInput): Promise<ActionState> {

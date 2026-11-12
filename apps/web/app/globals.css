@@ -53,3 +53,42 @@ body {
     border: none;
   }
 }
+
+/* DANFE: NFC-e em bobina de 80 mm e NF-e em A4. */
+.danfe-nfce {
+  width: 80mm;
+  max-width: 100%;
+  border: 1px solid #e2e8f0;
+}
+.danfe-nfe {
+  width: 210mm;
+  max-width: 100%;
+  border: 1px solid #e2e8f0;
+}
+.danfe-box {
+  border: 1px solid #000;
+  border-radius: 2px;
+  padding: 4px;
+}
+.danfe-warning {
+  margin: 6px 0;
+  text-align: center;
+  font-weight: 700;
+  color: #b91c1c;
+}
+.danfe-qrcode svg {
+  width: 32mm;
+  height: 32mm;
+  margin: 0 auto;
+}
+.danfe-code128 svg {
+  width: 100%;
+  height: 12mm;
+}
+@media print {
+  .danfe-nfce,
+  .danfe-nfe {
+    border: none;
+    margin: 0;
+  }
+}

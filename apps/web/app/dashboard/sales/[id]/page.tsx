@@ -2,12 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { CheckCircle2 } from 'lucide-react';
-import { retryFiscalAction } from '@/actions/sales';
 import { apiFetch, ApiError } from '@/lib/api';
 import { PAYMENT_METHOD_LABELS, formatDate, formatDateTime, formatMoney } from '@/lib/format';
 import { getCurrentUser } from '@/lib/session';
 import type { SaleDetail } from '@/lib/types';
 import { CancelSaleForm } from '@/components/sales/CancelSaleForm';
+import { FiscalCard } from '@/components/fiscal/FiscalCard';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PrintButton } from '@/components/ui/PrintButton';
 import {
@@ -15,7 +15,6 @@ import {
   FiscalStatusBadge,
   SaleStatusBadge,
 } from '@/components/ui/StatusBadges';
-import { SubmitButton } from '@/components/ui/SubmitButton';
 
 export const metadata: Metadata = { title: 'Venda' };
 
@@ -63,7 +62,11 @@ export default async function SaleDetailPage(props: {
           <>
             <PrintButton label="Imprimir recibo" />
             {isAdmin && sale.status === 'COMPLETED' && (
-              <CancelSaleForm saleId={sale.id} saleNumber={sale.number} />
+              <CancelSaleForm
+                saleId={sale.id}
+                saleNumber={sale.number}
+                fiscalModel={fiscal?.status === 'ISSUED' ? fiscal.model : undefined}
+              />
             )}
           </>
         }
@@ -71,18 +74,12 @@ export default async function SaleDetailPage(props: {
 
       <div className="flex flex-wrap gap-2">
         <SaleStatusBadge status={sale.status} />
-        {fiscal && sale.status === 'COMPLETED' && <FiscalStatusBadge status={fiscal.status} />}
+        {fiscal && <FiscalStatusBadge status={fiscal.status} model={fiscal.model} />}
       </div>
 
       {sale.status === 'CANCELLED' && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           Cancelada em {formatDateTime(sale.cancelledAt)}. Motivo: {sale.cancelReason}
-          {fiscal?.status === 'ISSUED' && (
-            <p className="mt-1 font-medium">
-              Atenção: a NF-e desta venda já tinha sido emitida. Cancele-a também no portal do
-              provedor fiscal.
-            </p>
-          )}
         </div>
       )}
 
@@ -192,33 +189,7 @@ export default async function SaleDetailPage(props: {
             </div>
           )}
 
-          {fiscal && sale.status === 'COMPLETED' && (
-            <div className="card no-print space-y-2 p-5 text-sm">
-              <h2 className="font-semibold text-slate-900">Nota fiscal (NF-e)</h2>
-              <p className="text-slate-600">
-                Provedor: {fiscal.provider}
-                {fiscal.externalId && ` · protocolo ${fiscal.externalId}`}
-              </p>
-              {fiscal.errorMessage && <p className="text-red-600">{fiscal.errorMessage}</p>}
-              <div className="flex flex-wrap gap-2">
-                {fiscal.pdfUrl && (
-                  <a href={fiscal.pdfUrl} target="_blank" rel="noreferrer" className="btn-secondary btn-sm">
-                    DANFE (PDF)
-                  </a>
-                )}
-                {fiscal.xmlUrl && (
-                  <a href={fiscal.xmlUrl} target="_blank" rel="noreferrer" className="btn-secondary btn-sm">
-                    XML
-                  </a>
-                )}
-                {isAdmin && (fiscal.status === 'FAILED' || fiscal.status === 'QUEUED') && (
-                  <form action={retryFiscalAction.bind(null, sale.id)}>
-                    <SubmitButton label="Reenviar NF-e" pendingLabel="Enviando..." variant="secondary" size="sm" />
-                  </form>
-                )}
-              </div>
-            </div>
-          )}
+          {fiscal && <FiscalCard saleId={sale.id} fiscal={fiscal} isAdmin={isAdmin} />}
         </div>
       </div>
     </div>

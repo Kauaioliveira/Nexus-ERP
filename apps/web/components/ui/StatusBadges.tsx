@@ -1,5 +1,6 @@
 import {
   ENTRY_STATUS_LABELS,
+  FISCAL_MODEL_LABELS,
   FISCAL_STATUS_LABELS,
   PURCHASE_STATUS_LABELS,
   SALE_STATUS_LABELS,
@@ -7,6 +8,7 @@ import {
 } from '@/lib/format';
 import type {
   FinancialEntryStatus,
+  FiscalModel,
   FiscalStatus,
   PurchaseOrderStatus,
   SaleStatus,
@@ -30,7 +32,9 @@ const FISCAL_TONES: Record<FiscalStatus, BadgeTone> = {
   QUEUED: 'info',
   PROCESSING: 'info',
   ISSUED: 'success',
-  FAILED: 'danger',
+  FAILED: 'warning',
+  REJECTED: 'danger',
+  CANCELLED: 'neutral',
 };
 
 export function SaleStatusBadge({ status }: { status: SaleStatus }) {
@@ -41,8 +45,12 @@ export function PurchaseStatusBadge({ status }: { status: PurchaseOrderStatus })
   return <Badge tone={PURCHASE_TONES[status]}>{PURCHASE_STATUS_LABELS[status]}</Badge>;
 }
 
-export function FiscalStatusBadge({ status }: { status: FiscalStatus }) {
-  return <Badge tone={FISCAL_TONES[status]}>NF-e: {FISCAL_STATUS_LABELS[status]}</Badge>;
+export function FiscalStatusBadge({ status, model = 'NFCE' }: { status: FiscalStatus; model?: FiscalModel }) {
+  return (
+    <Badge tone={FISCAL_TONES[status]}>
+      {FISCAL_MODEL_LABELS[model]}: {FISCAL_STATUS_LABELS[status]}
+    </Badge>
+  );
 }
 
 export function EntryStatusBadge({

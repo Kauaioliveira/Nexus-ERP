@@ -5,6 +5,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
+# O postinstall da API roda "prisma generate", que precisa do schema.
+COPY apps/api/prisma ./apps/api/prisma
 RUN npm ci --workspace=apps/api --include-workspace-root=false
 COPY apps/api ./apps/api
 RUN npm run prisma:generate --workspace=apps/api \

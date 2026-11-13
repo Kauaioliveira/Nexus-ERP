@@ -98,7 +98,8 @@ jobs:
           grep -q "No packages with unreviewed install scripts" pending.txt
       - name: Prisma Client gerado e argon2 carregando
         run: |
-          test -f node_modules/.prisma/client/index.js
+          # O client "stub" (gerado sem achar o schema) nao tem os enums.
+          grep -q "ADMIN" node_modules/.prisma/client/index.d.ts
           node -e "require('argon2').hash('ci').then(() => console.log('argon2 ok'))"
 
   docker:

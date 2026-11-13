@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  Customer,
   FinancialEntryStatus,
   FinancialEntryType,
+  FiscalModel,
   FiscalStatus,
   MovementType,
   PaymentMethod,
@@ -16,7 +18,8 @@ import {
   buildInstallmentEntries,
   isImmediatePayment,
 } from '../financial/financial-entries.builder';
-import { FiscalService } from '../fiscal/fiscal.service';
+import { FISCAL_DOCUMENT_SUMMARY, FiscalService } from '../fiscal/fiscal.service';
+import { isValidCpfOrCnpj, onlyDigits } from '../fiscal/nfe/brazil';
 import { applyStockDelta } from '../stock-movements/stock-balance';
 import { CancelSaleDto } from './dto/cancel-sale.dto';
 import { CreateSaleDto } from './dto/create-sale.dto';
@@ -51,12 +54,23 @@ export class SalesService {
       throw new BadRequestException('Venda a prazo precisa de um cliente identificado.');
     }
 
+    const fiscalModel = dto.fiscalModel ?? FiscalModel.NFCE;
+    const buyerDocument = dto.buyerDocument ? onlyDigits(dto.buyerDocument) : null;
+    if (buyerDocument && !isValidCpfOrCnpj(buyerDocument)) {
+      throw new BadRequestException('CPF/CNPJ na nota inválido.');
+    }
+
     const sale = await this.prisma.$transaction(async (tx) => {
       if (dto.customerId) {
         const customer = await tx.customer.findUnique({ where: { id: dto.customerId } });
         if (!customer || !customer.active) {
           throw new NotFoundException('Cliente nao encontrado.');
         }
+        if (fiscalModel === FiscalModel.NFE) assertNfeRecipient(customer);
+      } else if (fiscalModel === FiscalModel.NFE) {
+        throw new BadRequestException(
+          'NF-e precisa de um cliente com CPF/CNPJ e endereço completo.',
+        );
       }
 
       const lines: SaleLine[] = [];
@@ -136,6 +150,8 @@ export class SalesService {
         data: {
           saleId: createdSale.id,
           provider: fiscalProviderName,
+          model: fiscalModel,
+          buyerDocument: fiscalModel === FiscalModel.NFCE ? buyerDocument : null,
           status: FiscalStatus.QUEUED,
         },
       });
@@ -178,7 +194,7 @@ export class SalesService {
         take: pageSize,
         orderBy: { createdAt: 'desc' },
         include: {
-          fiscalDocument: true,
+          fiscalDocument: { select: FISCAL_DOCUMENT_SUMMARY },
           user: { select: { id: true, name: true } },
           customer: { select: { id: true, name: true } },
           _count: { select: { items: true } },
@@ -195,11 +211,37 @@ export class SalesService {
       where: { id },
       include: {
         items: {
-          include: { product: { select: { id: true, sku: true, name: true, unit: true } } },
+          include: {
+            product: {
+              select: {
+                id: true,
+                sku: true,
+                barcode: true,
+                name: true,
+                unit: true,
+                ncm: true,
+                cfop: true,
+                csosn: true,
+              },
+            },
+          },
         },
-        fiscalDocument: true,
+        fiscalDocument: { select: FISCAL_DOCUMENT_SUMMARY },
         user: { select: { id: true, name: true } },
-        customer: { select: { id: true, name: true, document: true } },
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            document: true,
+            email: true,
+            street: true,
+            number: true,
+            district: true,
+            city: true,
+            state: true,
+            zipCode: true,
+          },
+        },
         financialEntries: { orderBy: [{ type: 'asc' }, { installment: 'asc' }] },
       },
     });
@@ -214,6 +256,16 @@ export class SalesService {
   // Cancela uma venda concluida: devolve os itens ao estoque, cancela o que
   // ainda estava a receber e registra o estorno do que ja tinha sido pago.
   async cancel(id: string, dto: CancelSaleDto, userId: string) {
+    const current = await this.prisma.sale.findUnique({ where: { id }, select: { status: true } });
+    if (!current) throw new NotFoundException('Venda nao encontrada.');
+    if (current.status !== SaleStatus.COMPLETED) {
+      throw new BadRequestException('Apenas vendas concluidas podem ser canceladas.');
+    }
+
+    // Primeiro a nota: se a SEFAZ recusar o cancelamento (prazo vencido,
+    // justificativa curta), a venda nao e cancelada.
+    await this.fiscalService.cancelAuthorized(id, dto.reason);
+
     await this.prisma.$transaction(async (tx) => {
       const sale = await tx.sale.findUnique({
         where: { id },
@@ -291,12 +343,25 @@ export class SalesService {
           },
         });
       }
+
+      // Nota que ainda nao tinha sido autorizada nao sera mais emitida.
+      await tx.fiscalDocument.updateMany({
+        where: {
+          saleId: id,
+          status: { in: [FiscalStatus.QUEUED, FiscalStatus.FAILED, FiscalStatus.REJECTED] },
+        },
+        data: {
+          status: FiscalStatus.NOT_REQUESTED,
+          errorMessage: 'Venda cancelada antes da autorização.',
+        },
+      });
     });
 
     return this.findOneOrThrow(id);
   }
 
-  // Reenvia a NF-e de uma venda cuja emissao falhou ou nunca saiu da fila.
+  // Reenvia a nota de uma venda cuja emissao falhou, foi rejeitada (depois
+  // de corrigir o cadastro) ou nunca saiu da fila.
   async retryFiscalEmission(id: string) {
     const sale = await this.findOneOrThrow(id);
 
@@ -304,9 +369,15 @@ export class SalesService {
       throw new BadRequestException('Apenas vendas concluidas podem emitir NF-e.');
     }
 
-    const retryable: FiscalStatus[] = [FiscalStatus.FAILED, FiscalStatus.QUEUED];
+    const retryable: FiscalStatus[] = [
+      FiscalStatus.FAILED,
+      FiscalStatus.QUEUED,
+      FiscalStatus.REJECTED,
+    ];
     if (!sale.fiscalDocument || !retryable.includes(sale.fiscalDocument.status)) {
-      throw new BadRequestException('A NF-e desta venda nao esta pendente nem com falha.');
+      throw new BadRequestException(
+        'A nota desta venda nao esta pendente, com falha ou rejeitada.',
+      );
     }
 
     await this.prisma.fiscalDocument.update({
@@ -325,5 +396,23 @@ export class SalesService {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Nao foi possivel enfileirar a NF-e da venda ${saleId}: ${message}`);
     }
+  }
+}
+
+// NF-e (modelo 55) exige destinatario identificado e com endereco.
+function assertNfeRecipient(customer: Customer) {
+  const missing: string[] = [];
+  if (!customer.document || !isValidCpfOrCnpj(customer.document)) missing.push('CPF/CNPJ válido');
+  if (!customer.street) missing.push('logradouro');
+  if (!customer.number) missing.push('número');
+  if (!customer.district) missing.push('bairro');
+  if (!customer.cityCode || !/^\d{7}$/.test(customer.cityCode))
+    missing.push('código IBGE do município');
+  if (!customer.state) missing.push('UF');
+  if (!customer.zipCode) missing.push('CEP');
+  if (missing.length > 0) {
+    throw new BadRequestException(
+      `Para emitir NF-e, complete o cadastro do cliente: ${missing.join(', ')}. Ou emita NFC-e com CPF na nota.`,
+    );
   }
 }

@@ -2,6 +2,8 @@
 
 import { useActionState, useState } from 'react';
 import { createMovementAction } from '@/actions/stock';
+import { barcodeLookupAction } from '@/actions/products';
+import { CameraScanButton } from '@/components/scan/CameraScanner';
 import { type PosProduct, searchProductsAction } from '@/actions/sales';
 import { FormMessage } from '@/components/ui/FormMessage';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -14,7 +16,35 @@ export function MovementForm() {
   const [product, setProduct] = useState<PosProduct | null>(null);
   const [type, setType] = useState<MovementType>('ENTRADA');
 
+  const [notFound, setNotFound] = useState<string | null>(null);
+
   const { results } = useSearch(searchProductsAction, product ? '' : term);
+
+  // Leitor USB (Enter) ou camera: seleciona o produto pelo codigo exato.
+  async function selectByCode(raw: string) {
+    const code = raw.trim();
+    if (!code) return;
+    setNotFound(null);
+    const lookup = await barcodeLookupAction(code);
+    if (lookup?.product) {
+      setProduct({
+        id: lookup.product.id,
+        name: lookup.product.name,
+        sku: lookup.product.sku,
+        barcode: lookup.product.barcode,
+        unit: lookup.product.unit,
+        salePrice: Number(lookup.product.salePrice),
+        costPrice: Number(lookup.product.costPrice),
+        currentStock: lookup.product.currentStock,
+      });
+      setTerm('');
+    } else if (results.length === 1) {
+      setProduct(results[0]);
+    } else {
+      setTerm(code);
+      setNotFound(code);
+    }
+  }
 
   return (
     <form action={formAction} className="card space-y-4 p-5">
@@ -29,18 +59,33 @@ export function MovementForm() {
           Produto <span className="text-red-500">*</span>
         </label>
         <input type="hidden" name="productId" value={product?.id ?? ''} />
-        <input
-          id="mv-product"
-          value={product ? `${product.name} (estoque ${product.currentStock})` : term}
-          onChange={(event) => {
-            setProduct(null);
-            setTerm(event.target.value);
-          }}
-          placeholder="Buscar produto"
-          autoComplete="off"
-          className="input mt-1"
-        />
-        {results.length > 0 && (
+        <div className="mt-1 flex gap-2">
+          <input
+            id="mv-product"
+            value={product ? `${product.name} (estoque ${product.currentStock})` : term}
+            onChange={(event) => {
+              setProduct(null);
+              setNotFound(null);
+              setTerm(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                if (!product) void selectByCode(term);
+              }
+            }}
+            placeholder="Nome, SKU ou código de barras"
+            autoComplete="off"
+            className="input"
+          />
+          <CameraScanButton label="" onDetected={(code) => void selectByCode(code)} />
+        </div>
+        {notFound && (
+          <p className="mt-1 text-xs text-amber-700" role="alert">
+            Nenhum produto com o código {notFound}.
+          </p>
+        )}
+        {results.length > 0 && !notFound && (
           <ul className="absolute left-0 right-0 z-10 mt-1 max-h-60 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
             {results.map((option) => (
               <li key={option.id}>

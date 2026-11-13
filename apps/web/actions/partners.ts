@@ -21,6 +21,13 @@ function parsePartnerForm(resource: Resource, formData: FormData, editing: boole
     ...(resource === 'customers' && {
       address: optional('address'),
       notes: optional('notes'),
+      zipCode: optional('zipCode'),
+      street: optional('street'),
+      number: optional('number'),
+      district: optional('district'),
+      city: optional('city'),
+      cityCode: optional('cityCode'),
+      state: optional('state'),
     }),
   };
 }

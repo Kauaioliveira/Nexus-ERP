@@ -15,6 +15,7 @@ import {
   Users,
   Wallet,
   PackagePlus,
+  Building2,
 } from 'lucide-react';
 import { Role } from '@/lib/types';
 
@@ -50,6 +51,7 @@ const groups: { title?: string; links: NavLink[] }[] = [
     links: [
       { href: '/dashboard/finance', label: 'Financeiro', icon: Wallet, adminOnly: true },
       { href: '/dashboard/users', label: 'Usuários', icon: UserCog, adminOnly: true },
+      { href: '/dashboard/settings', label: 'Empresa e fiscal', icon: Building2, adminOnly: true },
     ],
   },
 ];

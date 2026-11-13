@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useMemo, useRef, useState, useTransition } from 'react';
 import { Minus, Plus, Search, Trash2, UserRound, X } from 'lucide-react';
+import { barcodeLookupAction } from '@/actions/products';
+import { CameraScanButton } from '@/components/scan/CameraScanner';
 import {
   createSaleAction,
   type PosProduct,
@@ -15,7 +17,7 @@ import {
   formatMoney,
   todayInput,
 } from '@/lib/format';
-import type { PaymentMethod } from '@/lib/types';
+import type { FiscalModel, PaymentMethod } from '@/lib/types';
 import { useSearch } from '@/lib/use-search';
 
 interface CartLine {
@@ -26,6 +28,15 @@ interface CartLine {
 type CustomerOption = Awaited<ReturnType<typeof searchCustomersAction>>[number];
 
 const toCents = (value: number) => Math.round(value * 100);
+
+// "3*7891000315507" (ou 3x) adiciona 3 unidades, como nos PDVs de mercado.
+function parseQuantityPrefix(raw: string): { quantity: number; code: string } {
+  const match = raw.trim().match(/^(\d{1,4})\s*[*xX]\s*(\S+)$/);
+  if (match && Number(match[1]) > 0) return { quantity: Number(match[1]), code: match[2] };
+  return { quantity: 1, code: raw.trim() };
+}
+
+const looksLikeBarcode = (code: string) => /^\d{8,14}$/.test(code);
 
 export function PointOfSale() {
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -38,7 +49,10 @@ export function PointOfSale() {
   const [firstDueDate, setFirstDueDate] = useState(todayInput(30));
   const [cashReceived, setCashReceived] = useState('');
   const [notes, setNotes] = useState('');
+  const [fiscalModel, setFiscalModel] = useState<FiscalModel>('NFCE');
+  const [buyerDocument, setBuyerDocument] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [unknownCode, setUnknownCode] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -54,16 +68,17 @@ export function PointOfSale() {
   const totalCents = Math.max(subtotalCents - discountCents, 0);
   const changeCents = toCents(Number(cashReceived.replace(',', '.')) || 0) - totalCents;
 
-  function addProduct(product: PosProduct) {
+  function addProduct(product: PosProduct, quantity = 1) {
     setError(null);
+    setUnknownCode(null);
     setCart((current) => {
       const existing = current.find((line) => line.product.id === product.id);
       if (existing) {
         return current.map((line) =>
-          line.product.id === product.id ? { ...line, quantity: line.quantity + 1 } : line,
+          line.product.id === product.id ? { ...line, quantity: line.quantity + quantity } : line,
         );
       }
-      return [...current, { product, quantity: 1 }];
+      return [...current, { product, quantity }];
     });
     setProductTerm('');
     searchRef.current?.focus();
@@ -78,15 +93,49 @@ export function PointOfSale() {
   }
 
   // Enter na busca: com um leitor de codigo de barras (que "digita" o
-  // codigo e aperta Enter), o produto cai direto no carrinho.
-  async function handleSearchEnter() {
-    const term = productTerm.trim();
-    if (!term) return;
-    const found = products.results.length > 0 ? products.results : await searchProductsAction(term);
-    const exact = found.find((p) => p.barcode === term || p.sku.toLowerCase() === term.toLowerCase());
-    const pick = exact ?? (found.length === 1 ? found[0] : undefined);
-    if (pick) addProduct(pick);
-    else if (found.length === 0) setError(`Nenhum produto encontrado para "${term}".`);
+  // codigo e aperta Enter), o produto cai direto no carrinho. Primeiro
+  // tenta o codigo exato (barras ou SKU); depois a busca por nome.
+  async function addByCode(raw: string) {
+    const { quantity, code } = parseQuantityPrefix(raw);
+    if (!code) return;
+    setError(null);
+    setUnknownCode(null);
+
+    const lookup = await barcodeLookupAction(code);
+    if (lookup?.product) {
+      if (!lookup.product.active) {
+        setError(`"${lookup.product.name}" está inativo e não pode ser vendido.`);
+        return;
+      }
+      addProduct(
+        {
+          id: lookup.product.id,
+          name: lookup.product.name,
+          sku: lookup.product.sku,
+          barcode: lookup.product.barcode,
+          unit: lookup.product.unit,
+          salePrice: Number(lookup.product.salePrice),
+          costPrice: Number(lookup.product.costPrice),
+          currentStock: lookup.product.currentStock,
+        },
+        quantity,
+      );
+      return;
+    }
+
+    const found = await searchProductsAction(code);
+    if (found.length === 1) {
+      addProduct(found[0], quantity);
+      return;
+    }
+    if (found.length === 0) {
+      setError(
+        lookup?.suggestion
+          ? `O código ${code} não está cadastrado. Parece ser "${lookup.suggestion.name}".`
+          : `Nenhum produto encontrado para "${code}".`,
+      );
+      if (looksLikeBarcode(code)) setUnknownCode(code);
+    }
   }
 
   function finish() {
@@ -97,6 +146,10 @@ export function PointOfSale() {
     }
     if (paymentMethod === 'A_PRAZO' && !customer) {
       setError('Venda a prazo precisa de um cliente. Busque ou cadastre o cliente.');
+      return;
+    }
+    if (fiscalModel === 'NFE' && !customer) {
+      setError('NF-e precisa de um cliente com CPF/CNPJ e endereço. Para consumidor final, use NFC-e.');
       return;
     }
     const overStock = cart.find((line) => line.quantity > line.product.currentStock);
@@ -116,6 +169,8 @@ export function PointOfSale() {
         installments: deferred ? installments : undefined,
         firstDueDate: deferred ? firstDueDate : undefined,
         notes: notes.trim() || undefined,
+        fiscalModel,
+        buyerDocument: fiscalModel === 'NFCE' ? buyerDocument.replace(/\D/g, '') || undefined : undefined,
       });
       if (result?.error) setError(result.error);
     });
@@ -128,7 +183,8 @@ export function PointOfSale() {
           <label htmlFor="pos-search" className="label">
             Adicionar produto
           </label>
-          <div className="relative mt-1">
+          <div className="mt-1 flex gap-2">
+          <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" aria-hidden />
             <input
               id="pos-search"
@@ -143,13 +199,26 @@ export function PointOfSale() {
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();
-                  void handleSearchEnter();
+                  void addByCode(productTerm);
                 }
               }}
-              placeholder="Nome, SKU ou código de barras (Enter adiciona)"
+              placeholder="Nome, SKU ou código (Enter adiciona; 3*código = 3 un.)"
               className="input pl-9"
             />
           </div>
+          <CameraScanButton continuous onDetected={(code) => void addByCode(code)} />
+          </div>
+          {unknownCode && (
+            <p className="mt-2 text-sm">
+              <Link
+                href={`/dashboard/products/new?barcode=${encodeURIComponent(unknownCode)}`}
+                target="_blank"
+                className="font-medium text-brand-700 underline"
+              >
+                Cadastrar produto com o código {unknownCode}
+              </Link>
+            </p>
+          )}
           {productTerm && (
             <ul className="absolute left-4 right-4 z-10 mt-1 max-h-80 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
               {products.loading && products.results.length === 0 && (
@@ -408,6 +477,41 @@ export function PointOfSale() {
                   className="input mt-1"
                 />
               </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="pos-fiscal" className="label">
+                Nota fiscal
+              </label>
+              <select
+                id="pos-fiscal"
+                value={fiscalModel}
+                onChange={(event) => setFiscalModel(event.target.value as FiscalModel)}
+                className="input mt-1"
+              >
+                <option value="NFCE">NFC-e (consumidor)</option>
+                <option value="NFE">NF-e (cliente com endereço)</option>
+              </select>
+            </div>
+            {fiscalModel === 'NFCE' ? (
+              <div>
+                <label htmlFor="pos-buyer" className="label">
+                  CPF/CNPJ na nota
+                </label>
+                <input
+                  id="pos-buyer"
+                  inputMode="numeric"
+                  value={buyerDocument}
+                  onChange={(event) => setBuyerDocument(event.target.value)}
+                  placeholder={customer?.document ? 'Do cliente' : 'Opcional'}
+                  maxLength={18}
+                  className="input mt-1"
+                />
+              </div>
+            ) : (
+              <p className="self-end pb-2 text-xs text-slate-500">Usa o CPF/CNPJ e o endereço do cliente.</p>
             )}
           </div>
 

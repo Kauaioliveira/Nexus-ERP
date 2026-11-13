@@ -17,5 +17,13 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "allowScripts": {
+    "argon2": true,
+    "msgpackr-extract": true,
+    "prisma": true,
+    "unrs-resolver": true,
+    "@prisma/engines": true,
+    "@prisma/client": true
   }
 }

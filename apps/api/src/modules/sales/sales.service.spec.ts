@@ -23,13 +23,13 @@ describe('SalesService', () => {
     sale: { create: jest.Mock; findUnique: jest.Mock; updateMany: jest.Mock };
     stockMovement: { createMany: jest.Mock };
     financialEntry: { createMany: jest.Mock; updateMany: jest.Mock; create: jest.Mock };
-    fiscalDocument: { create: jest.Mock };
+    fiscalDocument: { create: jest.Mock; updateMany: jest.Mock };
   };
   let prisma: {
     $transaction: jest.Mock;
     sale: { findUnique: jest.Mock; findMany: jest.Mock; count: jest.Mock };
   };
-  let fiscalService: { enqueueEmission: jest.Mock };
+  let fiscalService: { enqueueEmission: jest.Mock; cancelAuthorized: jest.Mock };
 
   beforeEach(async () => {
     products = createFakeProductTable([
@@ -61,7 +61,7 @@ describe('SalesService', () => {
       },
       stockMovement: { createMany: jest.fn() },
       financialEntry: { createMany: jest.fn(), updateMany: jest.fn(), create: jest.fn() },
-      fiscalDocument: { create: jest.fn() },
+      fiscalDocument: { create: jest.fn(), updateMany: jest.fn() },
     };
 
     prisma = {
@@ -73,7 +73,10 @@ describe('SalesService', () => {
       },
     };
 
-    fiscalService = { enqueueEmission: jest.fn().mockResolvedValue(undefined) };
+    fiscalService = {
+      enqueueEmission: jest.fn().mockResolvedValue(undefined),
+      cancelAuthorized: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -137,7 +140,13 @@ describe('SalesService', () => {
         }),
       ]);
       expect(tx.fiscalDocument.create).toHaveBeenCalledWith({
-        data: { saleId: 'sale-1', provider: 'sandbox', status: FiscalStatus.QUEUED },
+        data: {
+          saleId: 'sale-1',
+          provider: 'sandbox',
+          model: 'NFCE',
+          buyerDocument: null,
+          status: FiscalStatus.QUEUED,
+        },
       });
       expect(fiscalService.enqueueEmission).toHaveBeenCalledWith('sale-1');
     });
@@ -234,11 +243,21 @@ describe('SalesService', () => {
       ],
     };
 
+    beforeEach(() => {
+      prisma.sale.findUnique.mockResolvedValue(completedSale);
+    });
+
     it('returns stock, cancels open receivables and refunds what was already paid', async () => {
       tx.sale.findUnique.mockResolvedValue(completedSale);
 
       await service.cancel('sale-1', { reason: 'Cliente desistiu' }, 'user-1');
 
+      expect(fiscalService.cancelAuthorized).toHaveBeenCalledWith('sale-1', 'Cliente desistiu');
+      expect(tx.fiscalDocument.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: FiscalStatus.NOT_REQUESTED }),
+        }),
+      );
       expect(stockOf('prod-1')).toBe(13);
       expect(tx.stockMovement.createMany).toHaveBeenCalledWith({
         data: [expect.objectContaining({ type: MovementType.ENTRADA, quantity: 3 })],
@@ -259,6 +278,16 @@ describe('SalesService', () => {
           description: 'Estorno da venda #42',
         }),
       });
+    });
+
+    it('keeps the sale when the SEFAZ refuses to cancel the invoice', async () => {
+      fiscalService.cancelAuthorized.mockRejectedValue(new BadRequestException('501'));
+
+      await expect(
+        service.cancel('sale-1', { reason: 'Cliente desistiu da compra' }, 'user-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(stockOf('prod-1')).toBe(10);
     });
 
     it('refuses to cancel a sale twice', async () => {

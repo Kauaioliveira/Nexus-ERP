@@ -1,6 +1,7 @@
 import type {
   FinancialEntryStatus,
   FinancialEntryType,
+  FiscalModel,
   FiscalStatus,
   MovementType,
   PaymentMethod,
@@ -76,9 +77,32 @@ export const FISCAL_STATUS_LABELS: Record<FiscalStatus, string> = {
   NOT_REQUESTED: 'Não emitida',
   QUEUED: 'Na fila',
   PROCESSING: 'Emitindo',
-  ISSUED: 'Emitida',
-  FAILED: 'Falhou',
+  ISSUED: 'Autorizada',
+  FAILED: 'Falha de comunicação',
+  REJECTED: 'Rejeitada',
+  CANCELLED: 'Cancelada',
 };
+
+export const FISCAL_MODEL_LABELS: Record<FiscalModel, string> = {
+  NFCE: 'NFC-e',
+  NFE: 'NF-e',
+};
+
+export function formatDocument(value: string | null | undefined): string {
+  const digits = (value ?? '').replace(/\D/g, '');
+  if (digits.length === 11) return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  if (digits.length === 14) return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  return value ?? '';
+}
+
+export function formatAccessKey(key: string | null | undefined): string {
+  return (key ?? '').replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+
+export function formatZip(value: string | null | undefined): string {
+  const digits = (value ?? '').replace(/\D/g, '');
+  return digits.length === 8 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : (value ?? '');
+}
 
 export const MOVEMENT_TYPE_LABELS: Record<MovementType, string> = {
   ENTRADA: 'Entrada',

@@ -22,6 +22,11 @@ function parseProductForm(formData: FormData) {
     minStock: formData.get('minStock') ? Number(formData.get('minStock')) : undefined,
     categoryId: emptyToUndefined(formData.get('categoryId')),
     supplierId: emptyToUndefined(formData.get('supplierId')),
+    ncm: emptyToUndefined(formData.get('ncm')),
+    cest: emptyToUndefined(formData.get('cest')),
+    cfop: emptyToUndefined(formData.get('cfop')),
+    origin: formData.get('origin') ? Number(formData.get('origin')) : undefined,
+    csosn: emptyToUndefined(formData.get('csosn')),
   };
 }
 
@@ -78,10 +83,54 @@ export interface ScannedProduct {
   sku: string;
 }
 
+export interface BarcodeLookupResult {
+  code: string;
+  validGtin: boolean;
+  restricted: boolean;
+  product: {
+    id: string;
+    sku: string;
+    barcode: string | null;
+    name: string;
+    unit: string;
+    salePrice: string;
+    costPrice: string;
+    currentStock: number;
+    active: boolean;
+    ncm: string | null;
+  } | null;
+  suggestion: {
+    name: string;
+    brand?: string;
+    quantity?: string;
+    imageUrl?: string;
+    ncm?: string;
+    cest?: string;
+    source: 'cosmos' | 'openfoodfacts' | 'openbeautyfacts' | 'openproductsfacts' | 'openpetfoodfacts';
+  } | null;
+}
+
+// Identifica um codigo lido (leitor USB, camera ou digitado): primeiro no
+// cadastro da loja (codigo de barras ou SKU exato); se nao existir, a API
+// sugere nome/NCM a partir de uma base externa de GTIN.
+export async function barcodeLookupAction(code: string): Promise<BarcodeLookupResult | null> {
+  const trimmed = code.trim();
+  if (!trimmed) return null;
+  try {
+    return await apiFetch<BarcodeLookupResult>(`/products/barcode/${encodeURIComponent(trimmed)}`);
+  } catch {
+    return null;
+  }
+}
+
 // Chamada diretamente pelo componente cliente do leitor de codigo (nao
 // esta presa a um <form>): Server Actions podem ser invocadas como
 // funcoes normais a partir de handlers de evento no client.
 export async function lookupProductByCodeAction(code: string): Promise<ScannedProduct | null> {
+  const exact = await barcodeLookupAction(code);
+  if (exact?.product) {
+    return { id: exact.product.id, name: exact.product.name, sku: exact.product.sku };
+  }
   const trimmed = code.trim();
   if (!trimmed) return null;
 

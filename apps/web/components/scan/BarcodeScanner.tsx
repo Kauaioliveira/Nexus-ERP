@@ -1,159 +1,116 @@
 'use client';
 
-import { FormEvent, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import type { Html5Qrcode } from 'html5-qrcode';
-import { lookupProductByCodeAction } from '@/actions/products';
-import type { ScannedProduct } from '@/actions/products';
+import Link from 'next/link';
+import { FormEvent, useRef, useState } from 'react';
+import { barcodeLookupAction, type BarcodeLookupResult } from '@/actions/products';
+import { formatMoney } from '@/lib/format';
+import { CameraScanner } from './CameraScanner';
 
 type ScanState =
-  | { status: 'starting' }
-  | { status: 'scanning' }
-  | { status: 'camera-unavailable' }
+  | { status: 'idle' }
   | { status: 'looking-up'; code: string }
-  | { status: 'found'; code: string; product: ScannedProduct }
-  | { status: 'not-found'; code: string };
+  | { status: 'done'; result: BarcodeLookupResult }
+  | { status: 'error'; code: string };
 
-const READER_ELEMENT_ID = 'barcode-reader';
-
-export function BarcodeScanner() {
-  const router = useRouter();
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+export function BarcodeScanner({ canCreate }: { canCreate: boolean }) {
   const busyRef = useRef(false);
-  const [state, setState] = useState<ScanState>({ status: 'starting' });
+  const [state, setState] = useState<ScanState>({ status: 'idle' });
   const [manualCode, setManualCode] = useState('');
 
-  async function handleCode(decodedText: string) {
+  async function handleCode(code: string) {
     if (busyRef.current) return;
     busyRef.current = true;
-    setState({ status: 'looking-up', code: decodedText });
-
-    const product = await lookupProductByCodeAction(decodedText);
-    setState(product ? { status: 'found', code: decodedText, product } : { status: 'not-found', code: decodedText });
-
-    setTimeout(() => {
-      busyRef.current = false;
-    }, 1500);
+    setState({ status: 'looking-up', code });
+    const result = await barcodeLookupAction(code);
+    setState(result ? { status: 'done', result } : { status: 'error', code });
+    busyRef.current = false;
   }
 
   function handleManualSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!manualCode.trim()) return;
     void handleCode(manualCode.trim());
+    setManualCode('');
   }
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function start() {
-      // Import dinamico: a biblioteca acessa APIs de navegador (camera,
-      // MediaDevices) que nao existem durante a renderizacao no servidor.
-      const { Html5Qrcode } = await import('html5-qrcode');
-      if (cancelled) return;
-
-      const scanner = new Html5Qrcode(READER_ELEMENT_ID);
-      scannerRef.current = scanner;
-
-      try {
-        await scanner.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 150 } },
-          (decodedText) => {
-            void handleCode(decodedText);
-          },
-          () => {
-            // Falha ao decodificar um unico frame - esperado enquanto o
-            // usuario posiciona o codigo, nao precisa de tratamento.
-          },
-        );
-        if (!cancelled) setState({ status: 'scanning' });
-      } catch {
-        // Sem camera disponivel ou permissao negada: o formulario de
-        // digitacao manual abaixo continua funcionando normalmente, entao
-        // isso nao e um erro fatal, so um estado informativo.
-        if (!cancelled) setState({ status: 'camera-unavailable' });
-      }
-    }
-
-    start();
-
-    return () => {
-      cancelled = true;
-      const scanner = scannerRef.current;
-      if (scanner) {
-        scanner
-          .stop()
-          .then(() => scanner.clear())
-          .catch(() => {
-            // camera pode ja ter sido liberada - seguro ignorar
-          });
-      }
-    };
-  }, []);
+  const result = state.status === 'done' ? state.result : null;
 
   return (
     <div className="space-y-4">
-      <div
-        id={READER_ELEMENT_ID}
-        role="img"
-        aria-label="Visualização da câmera para leitura de código de barras ou QR"
-        className="mx-auto w-full max-w-sm overflow-hidden rounded-xl border border-slate-200 bg-black"
-      />
-
-      {state.status === 'camera-unavailable' && (
-        <p className="text-center text-sm text-slate-500">
-          Câmera indisponível neste dispositivo. Digite o código manualmente abaixo.
-        </p>
-      )}
+      <CameraScanner onDetected={(code) => void handleCode(code)} />
 
       <form onSubmit={handleManualSubmit} className="mx-auto flex max-w-sm gap-2">
         <div className="flex-1">
           <label htmlFor="manual-code" className="sr-only">
-            Digitar código de barras ou SKU manualmente
+            Digitar código de barras ou SKU
           </label>
           <input
             id="manual-code"
             type="text"
             value={manualCode}
             onChange={(event) => setManualCode(event.target.value)}
-            placeholder="Ou digite o código aqui"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            placeholder="Leitor USB ou digite o código"
+            className="input"
+            autoFocus
           />
         </div>
-        <button
-          type="submit"
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
+        <button type="submit" className="btn-secondary">
           Buscar
         </button>
       </form>
 
-      <div aria-live="polite" className="space-y-4">
-        {state.status === 'starting' && <p className="text-center text-sm text-slate-500">Iniciando câmera...</p>}
-
+      <div aria-live="polite" className="mx-auto max-w-sm space-y-4">
         {state.status === 'looking-up' && (
-          <p className="text-center text-sm text-slate-500">Buscando produto para o código {state.code}...</p>
+          <p className="text-center text-sm text-slate-500">Buscando o código {state.code}...</p>
+        )}
+        {state.status === 'error' && (
+          <p className="text-center text-sm text-amber-700" role="alert">
+            Não foi possível consultar o código {state.code}.
+          </p>
         )}
 
-        {state.status === 'found' && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
-            <p className="text-sm text-emerald-700">
-              Encontrado: <strong>{state.product.name}</strong> (SKU {state.product.sku})
+        {result?.product && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center text-sm text-emerald-800">
+            <p>
+              <strong>{result.product.name}</strong> · SKU {result.product.sku}
             </p>
-            <button
-              type="button"
-              onClick={() => router.push(`/dashboard/products/${state.product.id}`)}
-              className="mt-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-            >
+            <p className="mt-1">
+              {formatMoney(result.product.salePrice)} · estoque {result.product.currentStock} {result.product.unit}
+              {!result.product.active && ' · inativo'}
+            </p>
+            <Link href={`/dashboard/products/${result.product.id}`} className="btn-primary mt-3">
               Abrir produto
-            </button>
+            </Link>
           </div>
         )}
 
-        {state.status === 'not-found' && (
-          <p className="text-center text-sm text-amber-700" role="alert">
-            Nenhum produto encontrado para o código {state.code}.
-          </p>
+        {result && !result.product && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center text-sm text-amber-800" role="alert">
+            <p>Nenhum produto da loja tem o código {result.code}.</p>
+            {result.suggestion && (
+              <p className="mt-1">
+                Parece ser: <strong>{result.suggestion.name}</strong>
+                {result.suggestion.brand && ` (${result.suggestion.brand})`}
+              </p>
+            )}
+            {!result.validGtin && <p className="mt-1">O código não é um GTIN válido.</p>}
+            {result.validGtin && !result.restricted && !result.suggestion && (
+              <p className="mt-1">
+                Ele também não está nas bases públicas consultadas. Cadastre os dados manualmente.
+              </p>
+            )}
+            {!canCreate && (
+              <p className="mt-1">Peça a um administrador para cadastrar o produto.</p>
+            )}
+            {canCreate && (
+              <Link
+                href={`/dashboard/products/new?barcode=${encodeURIComponent(result.code)}`}
+                className="btn-primary mt-3"
+              >
+                Cadastrar produto com este código
+              </Link>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -29,6 +29,13 @@ export interface Customer {
   email: string | null;
   phone: string | null;
   address: string | null;
+  zipCode: string | null;
+  street: string | null;
+  number: string | null;
+  district: string | null;
+  city: string | null;
+  cityCode: string | null;
+  state: string | null;
   notes: string | null;
   active: boolean;
   createdAt: string;
@@ -46,6 +53,11 @@ export interface Product {
   name: string;
   description: string | null;
   unit: string;
+  ncm: string | null;
+  cest: string | null;
+  cfop: string;
+  origin: number;
+  csosn: string;
   costPrice: string;
   salePrice: string;
   minStock: number;
@@ -69,7 +81,15 @@ export type PaymentMethod =
 export type PurchaseOrderStatus = 'ORDERED' | 'RECEIVED' | 'CANCELLED';
 export type FinancialEntryType = 'RECEIVABLE' | 'PAYABLE';
 export type FinancialEntryStatus = 'OPEN' | 'PAID' | 'CANCELLED';
-export type FiscalStatus = 'NOT_REQUESTED' | 'QUEUED' | 'PROCESSING' | 'ISSUED' | 'FAILED';
+export type FiscalStatus =
+  | 'NOT_REQUESTED'
+  | 'QUEUED'
+  | 'PROCESSING'
+  | 'ISSUED'
+  | 'FAILED'
+  | 'REJECTED'
+  | 'CANCELLED';
+export type FiscalModel = 'NFE' | 'NFCE';
 
 export interface StockMovement {
   id: string;
@@ -104,10 +124,55 @@ export interface FinancialEntry {
 export interface FiscalDocument {
   status: FiscalStatus;
   provider: string;
-  externalId: string | null;
-  pdfUrl: string | null;
-  xmlUrl: string | null;
+  model: FiscalModel;
+  environment: number;
+  series: number | null;
+  number: number | null;
+  accessKey: string | null;
+  protocol: string | null;
+  statusCode: number | null;
+  statusMessage: string | null;
+  buyerDocument: string | null;
+  qrCodeUrl: string | null;
+  authorizedAt: string | null;
+  cancelledAt: string | null;
+  cancelProtocol: string | null;
+  cancelReason: string | null;
   errorMessage: string | null;
+}
+
+export interface CompanySettings {
+  legalName: string;
+  tradeName: string | null;
+  cnpj: string;
+  stateRegistration: string;
+  taxRegime: number;
+  zipCode: string;
+  street: string;
+  number: string;
+  district: string;
+  city: string;
+  cityCode: string;
+  state: string;
+  phone: string | null;
+  environment: number;
+  nfeSeries: number;
+  nfeNextNumber: number;
+  nfceSeries: number;
+  nfceNextNumber: number;
+  cscId: string;
+  cscToken?: string;
+  simulateSefazOffline: boolean;
+}
+
+export interface CustomerAddress {
+  zipCode: string | null;
+  street: string | null;
+  number: string | null;
+  district: string | null;
+  city: string | null;
+  cityCode: string | null;
+  state: string | null;
 }
 
 export interface Sale {
@@ -122,7 +187,11 @@ export interface Sale {
   cancelledAt: string | null;
   cancelReason: string | null;
   createdAt: string;
-  customer?: { id: string; name: string; document?: string | null } | null;
+  customer?:
+    | ({ id: string; name: string; document?: string | null; email?: string | null } & Partial<
+        Omit<CustomerAddress, 'cityCode'>
+      >)
+    | null;
   user?: { id: string; name: string };
   fiscalDocument?: FiscalDocument | null;
   _count?: { items: number };
@@ -134,7 +203,16 @@ export interface SaleDetail extends Sale {
     quantity: number;
     unitPrice: string;
     unitCost: string;
-    product: { id: string; sku: string; name: string; unit: string };
+    product: {
+      id: string;
+      sku: string;
+      barcode: string | null;
+      name: string;
+      unit: string;
+      ncm: string | null;
+      cfop: string;
+      csosn: string;
+    };
   }[];
   financialEntries: FinancialEntry[];
 }

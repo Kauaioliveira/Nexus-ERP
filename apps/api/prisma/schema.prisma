@@ -61,7 +61,16 @@ enum FiscalStatus {
   QUEUED
   PROCESSING
   ISSUED
-  FAILED
+  FAILED // falha de comunicacao (ex: SEFAZ fora do ar) - tenta de novo
+  REJECTED // SEFAZ rejeitou (dado invalido) - corrigir e reenviar
+  CANCELLED // evento de cancelamento homologado
+}
+
+// Modelo do documento fiscal: 55 = NF-e (venda identificada, A4),
+// 65 = NFC-e (cupom do consumidor no PDV).
+enum FiscalModel {
+  NFE
+  NFCE
 }
 
 model User {
@@ -125,7 +134,15 @@ model Customer {
   document  String?  @unique // CPF/CNPJ
   email     String?
   phone     String?
-  address   String?
+  address   String? // complemento livre
+  // Endereco estruturado (obrigatorio para o destinatario da NF-e).
+  zipCode   String?
+  street    String?
+  number    String?
+  district  String?
+  city      String?
+  cityCode  String? // codigo IBGE do municipio (7 digitos)
+  state     String? // UF
   notes     String?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -144,6 +161,12 @@ model Product {
   name         String
   description  String?
   unit         String   @default("UN") // UN, KG, CX, etc.
+  // Dados fiscais usados na NF-e/NFC-e.
+  ncm          String? // 8 digitos
+  cest         String? // 7 digitos, quando ha substituicao tributaria
+  cfop         String   @default("5102") // venda de mercadoria dentro do estado
+  origin       Int      @default(0) // 0 = nacional
+  csosn        String   @default("102") // Simples Nacional sem permissao de credito
   costPrice    Decimal  @db.Decimal(12, 2)
   salePrice    Decimal  @db.Decimal(12, 2)
   minStock     Int      @default(0)
@@ -318,18 +341,65 @@ model FinancialEntry {
 // O campo `provider` guarda qual adapter foi usado, permitindo trocar de
 // integracao sem alterar o restante do dominio.
 model FiscalDocument {
-  id           String       @id @default(uuid())
-  provider     String // ex: "focus-nfe-sandbox"
-  status       FiscalStatus @default(NOT_REQUESTED)
-  externalId   String? // id/protocolo retornado pelo provedor
-  xmlUrl       String?
-  pdfUrl       String?
-  errorMessage String?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id             String       @id @default(uuid())
+  provider       String // ex: "sandbox", "focus-nfe"
+  model          FiscalModel  @default(NFCE)
+  status         FiscalStatus @default(NOT_REQUESTED)
+  environment    Int          @default(2) // tpAmb: 1 = producao, 2 = homologacao
+  series         Int?
+  number         Int?
+  accessKey      String?      @unique
+  protocol       String? // nProt da autorizacao
+  statusCode     Int? // cStat devolvido pela SEFAZ (100 = autorizado)
+  statusMessage  String? // xMotivo
+  buyerDocument  String? // CPF/CNPJ na nota (NFC-e)
+  qrCodeUrl      String? // NFC-e
+  xml            String?      @db.Text // nfeProc autorizado
+  authorizedAt   DateTime?
+  cancelledAt    DateTime?
+  cancelProtocol String?
+  cancelReason   String?
+  cancelXml      String?      @db.Text // procEventoNFe do cancelamento
+  externalId     String? // id/protocolo retornado pelo provedor
+  xmlUrl         String?
+  pdfUrl         String?
+  errorMessage   String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   saleId String @unique
   sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
+  @@unique([model, series, number])
   @@map("fiscal_documents")
+}
+
+// Dados do emitente e da numeracao fiscal. Linha unica (id = 1).
+model CompanySettings {
+  id                   Int      @id @default(1)
+  legalName            String // razao social
+  tradeName            String? // nome fantasia
+  cnpj                 String
+  stateRegistration    String // inscricao estadual
+  taxRegime            Int      @default(1) // CRT: 1 = Simples Nacional, 3 = regime normal
+  zipCode              String
+  street               String
+  number               String
+  district             String
+  city                 String
+  cityCode             String // codigo IBGE do municipio
+  state                String // UF
+  phone                String?
+  environment          Int      @default(2) // so homologacao e suportada
+  nfeSeries            Int      @default(1)
+  nfeNextNumber        Int      @default(1)
+  nfceSeries           Int      @default(1)
+  nfceNextNumber       Int      @default(1)
+  cscId                String   @default("000001") // id do token CSC (QR Code da NFC-e)
+  cscToken             String // codigo de seguranca do contribuinte
+  // Liga um "apagao" da SEFAZ simulada, para testar falha e reenvio.
+  simulateSefazOffline Boolean  @default(false)
+  updatedAt            DateTime @updatedAt
+
+  @@map("company_settings")
 }

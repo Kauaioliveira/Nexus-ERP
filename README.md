@@ -34,7 +34,8 @@ dominio. Em desenvolvimento, um adapter sandbox simula as respostas do provedor.
 
 ## Rodando localmente
 
-Pre-requisitos: Node 22, Docker.
+Pre-requisitos: Node 22, Docker. No Windows, siga o passo a passo em
+[docs/TESTAR-NO-WINDOWS.md](docs/TESTAR-NO-WINDOWS.md).
 
 ```bash
 cp apps/api/.env.example apps/api/.env      # troque os segredos JWT
@@ -55,8 +56,9 @@ npm run dev:web    # http://localhost:3000
 npm run seed:demo --workspace=apps/api
 ```
 
-Popula o banco com dados **ficticios** (categorias, produtos, fornecedores, clientes,
-compras, vendas dos ultimos 30 dias e lancamentos financeiros) passando pelas mesmas regras
+Popula o banco com dados **ficticios** (categorias, produtos com NCM e GTIN validos,
+fornecedores, clientes com CPF/CNPJ e endereco, compras, vendas dos ultimos 30 dias com
+NFC-e, uma venda com NF-e e lancamentos financeiros) passando pelas mesmas regras
 de negocio da API. Cria o ADMIN do `.env` e um operador `caixa@nexuserp.local` com a mesma
 senha. Recusa rodar com `NODE_ENV=production` e nao faz nada se ja houver vendas.
 
@@ -110,6 +112,28 @@ rotacionados a cada uso — permitindo revogacao imediata em caso de logout ou c
 | `POST /v1/stock-movements` | Autenticado | Registra ENTRADA / SAIDA / AJUSTE |
 | `GET /v1/stock-movements` | Autenticado | Lista movimentacoes (filtro por produto/tipo, paginacao) |
 | `GET /v1/products/low-stock` | Autenticado | Produtos ativos com saldo no minimo ou abaixo, do mais critico ao menos critico |
+| `GET /v1/products/barcode/:code` | Autenticado | Identifica um codigo lido (leitor USB, camera ou digitado): produto da loja e, se nao houver, sugestao de cadastro |
+
+### Codigo de barras
+
+O leitor USB funciona como teclado (digita o codigo e aperta Enter), entao qualquer campo de
+codigo aceita o leitor; a camera do celular/notebook tambem le pelo navegador. A consulta
+procura primeiro no cadastro da loja (codigo de barras ou SKU exatos). Se o codigo nao
+estiver cadastrado e for um GTIN valido (digito verificador), a API sugere nome, marca e NCM
+a partir de uma base externa:
+
+- [Cosmos (Bluesoft)](https://cosmos.bluesoft.com.br), base brasileira com NCM, quando
+  `COSMOS_TOKEN` esta configurado (o plano gratuito tem limite diario de consultas);
+- bases abertas e gratuitas da familia Open Facts, consultadas em paralelo: Open Food Facts
+  (alimentos e bebidas), Open Beauty Facts (higiene e cosmeticos), Open Products Facts
+  (produtos em geral) e Open Pet Food Facts. Sao colaborativas e cobrem bem menos produtos
+  brasileiros que o Cosmos, entao para uso real o token do Cosmos e recomendado.
+
+`BARCODE_LOOKUP=off` desliga as consultas externas (o CI usa assim). Codigos com prefixo 2
+sao de uso interno (balanca, etiqueta propria) e saem na nota como `SEM GTIN`.
+
+No PDV, `3*codigo` adiciona 3 unidades; codigo desconhecido oferece "Cadastrar produto com
+este codigo", que abre o cadastro ja preenchido com a sugestao.
 
 O saldo de estoque (`currentStock`) nunca e editado diretamente: toda alteracao passa por
 uma `StockMovement`, criada e aplicada numa unica transacao. A baixa e um `UPDATE`
@@ -163,7 +187,11 @@ parcelas).
 | `GET /v1/sales` | Autenticado | Lista vendas (status, cliente, periodo, paginacao) |
 | `GET /v1/sales/:id` | Autenticado | Detalha uma venda, incluindo o status da NF-e |
 | `POST /v1/sales/:id/cancel` | ADMIN | Cancela a venda com motivo |
-| `POST /v1/sales/:id/fiscal/retry` | ADMIN | Reenfileira a emissao da NF-e |
+| `POST /v1/sales/:id/fiscal/retry` | ADMIN | Reenfileira a emissao da nota (falha ou rejeicao) |
+| `GET /v1/sales/:id/fiscal/xml` | Autenticado | XML autorizado (`nfeProc`) |
+| `GET /v1/sales/:id/fiscal/cancel-xml` | Autenticado | XML do evento de cancelamento (`procEventoNFe`) |
+| `GET /v1/company-settings` | Autenticado | Dados do emitente e numeracao (o CSC so aparece para ADMIN) |
+| `PATCH /v1/company-settings` | ADMIN | Atualiza emitente, series, numeracao, CSC e a simulacao de SEFAZ fora do ar |
 
 Uma venda e processada numa unica transacao: baixa o estoque de cada item, grava os
 `SaleItem` com o preco e o custo do momento (para calcular margem depois), gera o
@@ -175,13 +203,39 @@ das parcelas fica na primeira.
 Cancelar uma venda devolve o estoque, cancela as parcelas em aberto e lanca um estorno
 (conta a pagar) para o que ja tinha sido recebido.
 
-So depois da transacao ser confirmada e que a emissao da NF-e e **enfileirada**
-(BullMQ/Redis) — se o Redis estiver fora, a venda e concluida mesmo assim e a NF-e pode
-ser reenviada depois. Um worker consome a fila (`fiscal-emission`) e chama o
-`FiscalProvider` configurado — hoje um adapter `sandbox` que simula um provedor real
-(Focus NFe, PlugNotas, NFe.io) em homologacao. Falhas sao tentadas novamente (3
-tentativas, backoff exponencial) e o status fica em `FiscalDocument.status` (`QUEUED` →
-`PROCESSING` → `ISSUED` ou `FAILED`). Vendas canceladas nao sao emitidas.
+So depois da transacao ser confirmada e que a emissao da nota e **enfileirada**
+(BullMQ/Redis) — se o Redis estiver fora, a venda e concluida mesmo assim e a nota pode
+ser reenviada depois. Um worker consome a fila (`fiscal-emission`), monta a nota e chama o
+`FiscalProvider` configurado. Vendas canceladas nao sao emitidas.
+
+### NF-e e NFC-e emuladas (homologacao)
+
+O PDV escolhe o modelo: **NFC-e** (modelo 65, consumidor final, CPF/CNPJ opcional) ou
+**NF-e** (modelo 55, exige cliente com CPF/CNPJ e endereco completo). A emissao segue o
+layout 4.00 o mais perto possivel do real, mas contra uma **SEFAZ simulada**:
+
+- **Numeracao e chave de acesso**: serie e numero por modelo (reservados de forma
+  atomica), chave de 44 digitos com digito verificador modulo 11.
+- **XML**: `infNFe` completo (emitente, destinatario, itens com NCM/CFOP/CSOSN/origem,
+  PIS/COFINS, totais, pagamento) e, na NFC-e, o QR Code versao 2 com hash do CSC. Depois de
+  autorizado, o XML e guardado como `nfeProc` com o protocolo.
+- **Validacoes que a SEFAZ faria**, com o codigo de rejeicao real: CNPJ/IE do emitente
+  (207/209), CPF/CNPJ do destinatario (237/208), NCM (778), GTIN invalido (611), endereco
+  do destinatario na NF-e (225), totais (564/533/610), pagamentos (865). Rejeitada, a nota
+  fica `REJECTED` com o motivo e uma dica; corrigido o cadastro, "Reenviar" reaproveita o
+  mesmo numero.
+- **Fora do ar**: em Empresa e fiscal da para simular a SEFAZ indisponivel. A nota fica
+  `FAILED` (108) e o worker tenta de novo (3 tentativas, backoff exponencial).
+- **Cancelamento**: evento 110111 com protocolo (cStat 135), dentro do prazo (NFC-e 30
+  minutos, NF-e 24 horas) e com justificativa de 15 a 255 caracteres. Se a SEFAZ recusa
+  (por exemplo, prazo vencido), a venda nao e cancelada.
+- **DANFE**: NFC-e em bobina de 80 mm com QR Code e NF-e em A4 com codigo de barras da
+  chave, prontos para imprimir, com o aviso "sem valor fiscal".
+
+O que **nao** e emulado: assinatura digital (XMLDSig) com certificado A1, transmissao
+SOAP para a SEFAZ e validacao do XML contra o XSD oficial. A consulta pela chave ou pelo QR
+Code no portal da SEFAZ nao encontra essas notas. Para emitir de verdade, o caminho e um
+adapter de provedor (Focus NFe, PlugNotas, NFe.io) que implemente `FiscalProvider`.
 
 ## Financeiro (ADMIN)
 
@@ -216,16 +270,17 @@ navegador); o `proxy.ts` (antigo `middleware.ts`) protege `/dashboard/*`, redire
 | --- | --- |
 | `/login` | Login |
 | `/dashboard` | Visao geral do periodo: faturamento, ticket medio, lucro e margem (ADMIN), grafico de vendas por dia, formas de pagamento, mais vendidos, estoque baixo e contas vencidas |
-| `/dashboard/sales/new` | PDV: busca por nome/SKU/codigo de barras, carrinho, desconto, cliente, forma de pagamento e parcelas |
-| `/dashboard/sales` e `/[id]` | Vendas com filtros; detalhe com cancelamento, reenvio da NF-e e impressao |
+| `/dashboard/sales/new` | PDV: leitor USB ou camera (com `3*codigo`), carrinho, desconto, cliente, forma de pagamento, parcelas e escolha entre NFC-e e NF-e |
+| `/dashboard/sales` e `/[id]` | Vendas com filtros; detalhe com situacao da nota, chave, protocolo, XML, DANFE, reenvio e cancelamento |
 | `/dashboard/customers` | Clientes, com historico de compras |
 | `/dashboard/suppliers` | Fornecedores |
 | `/dashboard/purchases` | Pedidos de compra e recebimento de mercadoria |
 | `/dashboard/finance` | Contas a pagar e a receber, grafico de fluxo de caixa, baixa e estorno (ADMIN) |
 | `/dashboard/products` | Produtos com busca e filtros; detalhe com margem e movimentacoes |
 | `/dashboard/stock` | Movimentacoes e ajustes de estoque |
-| `/dashboard/scan` | Leitor de codigo de barras/QR pela camera, com digitacao manual |
+| `/dashboard/scan` | Leitor de codigo pela camera ou leitor USB; codigo desconhecido leva ao cadastro ja preenchido |
 | `/dashboard/users` | Gestao de usuarios (ADMIN) |
+| `/dashboard/settings` | Empresa e fiscal: emitente, series, numeracao, CSC e simulacao de SEFAZ fora do ar (ADMIN) |
 
 Links e dados de custo/margem aparecem apenas para ADMIN; a API faz a mesma checagem, entao
 esconder na tela nunca e a unica protecao.
@@ -253,6 +308,9 @@ baixa → cancelamento → relatorio) num banco real. Rode-os num banco descarta
 - CI roda typecheck, lint, testes unitarios (com cobertura), migracoes + testes e2e contra
   Postgres/Redis reais, build de api e web, build das imagens Docker e `npm audit` (falha
   com vulnerabilidade alta ou critica em dependencias de producao).
+- Scripts de instalação aprovados explicitamente em `allowScripts` (`package.json`): o npm
+  12+ bloqueia os demais. Um job do CI instala com npm 12 e Node 24 e falha se alguma
+  dependência nova precisar de aprovação, ou se o Prisma Client/argon2 não ficarem prontos.
 - Dependabot semanal com PRs agrupados (Nest, Next/React, Prisma, lint, minor/patch), para
   que pacotes que precisam subir juntos cheguem num PR so.
 - Auditoria de acessibilidade (WCAG 2.1 AA) aplicada ao frontend: labels em todos os campos
@@ -274,7 +332,9 @@ baixa → cancelamento → relatorio) num banco real. Rode-os num banco descarta
 - [x] Pedidos de compra com custo medio ponderado
 - [x] Contas a pagar e a receber, fluxo de caixa
 - [x] Relatorios de faturamento e margem
-- [ ] Adapter real de NF-e (Focus NFe / PlugNotas) e NFC-e para o PDV
+- [x] NF-e e NFC-e emuladas em homologacao (XML 4.00, chave, QR Code, rejeicoes, cancelamento, DANFE)
+- [x] Identificacao de produto por codigo de barras (cadastro, Cosmos, Open Food Facts)
+- [ ] Adapter real de NF-e/NFC-e (Focus NFe / PlugNotas) com certificado A1
 - [ ] Caixa (abertura/fechamento e sangria)
 - [ ] Inventario com contagem e importacao de produtos por planilha
 - [ ] Multiempresa / multiloja

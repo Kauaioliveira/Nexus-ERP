@@ -47,6 +47,26 @@ describe('BarcodeLookupService', () => {
     });
   });
 
+  it('procura tambem nas outras bases abertas (higiene, produtos em geral, pet)', async () => {
+    findFirst.mockResolvedValue(null);
+    fetchMock.mockImplementation(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes('openproductsfacts')
+          ? { status: 1, product: { product_name: 'Pilha alcalina AA', brands: 'Marca' } }
+          : { status: 0 },
+    }));
+    const service = new BarcodeLookupService(prisma, config({}));
+
+    const result = await service.lookup('7891000315507');
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(result.suggestion).toMatchObject({
+      name: 'Pilha alcalina AA',
+      source: 'openproductsfacts',
+    });
+  });
+
   it('usa o Cosmos (com NCM) quando ha token', async () => {
     findFirst.mockResolvedValue(null);
     fetchMock.mockResolvedValue({

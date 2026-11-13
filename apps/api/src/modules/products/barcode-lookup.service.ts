@@ -10,8 +10,19 @@ export interface BarcodeSuggestion {
   imageUrl?: string;
   ncm?: string;
   cest?: string;
-  source: 'cosmos' | 'openfoodfacts';
+  source: 'cosmos' | OpenFactsSource;
 }
+
+// Bases abertas da mesma familia (mesma API): alimentos, cosmeticos e
+// higiene, produtos em geral (limpeza, utilidades, eletronicos) e pet.
+// Consultadas em paralelo; vale a primeira da lista que conhecer o codigo.
+const OPEN_FACTS_HOSTS = {
+  openfoodfacts: 'world.openfoodfacts.org',
+  openbeautyfacts: 'world.openbeautyfacts.org',
+  openproductsfacts: 'world.openproductsfacts.org',
+  openpetfoodfacts: 'world.openpetfoodfacts.org',
+} as const;
+type OpenFactsSource = keyof typeof OPEN_FACTS_HOSTS;
 
 const PRODUCT_SELECT = {
   id: true,
@@ -63,7 +74,12 @@ export class BarcodeLookupService {
       const fromCosmos = await this.fetchCosmos(code, cosmosToken);
       if (fromCosmos) return fromCosmos;
     }
-    return this.fetchOpenFoodFacts(code);
+    const results = await Promise.all(
+      (Object.keys(OPEN_FACTS_HOSTS) as OpenFactsSource[]).map((source) =>
+        this.fetchOpenFacts(code, source),
+      ),
+    );
+    return results.find((result) => result !== null) ?? null;
   }
 
   private async fetchCosmos(code: string, token: string): Promise<BarcodeSuggestion | null> {
@@ -98,8 +114,11 @@ export class BarcodeLookupService {
     }
   }
 
-  private async fetchOpenFoodFacts(code: string): Promise<BarcodeSuggestion | null> {
-    const url = `https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,product_name_pt,brands,quantity,image_front_small_url`;
+  private async fetchOpenFacts(
+    code: string,
+    source: OpenFactsSource,
+  ): Promise<BarcodeSuggestion | null> {
+    const url = `https://${OPEN_FACTS_HOSTS[source]}/api/v2/product/${code}.json?fields=product_name,product_name_pt,brands,quantity,image_front_small_url`;
     try {
       const response = await fetch(url, {
         headers: { 'User-Agent': 'NexusERP/1.0 (https://github.com/Kauaioliveira/Nexus-ERP)' },
@@ -124,11 +143,13 @@ export class BarcodeLookupService {
         brand: found?.brands?.split(',')[0]?.trim() || undefined,
         quantity: found?.quantity?.trim() || undefined,
         imageUrl: found?.image_front_small_url,
-        source: 'openfoodfacts',
+        source,
       };
     } catch (error) {
       // Sem internet ou base fora do ar: o cadastro segue manual.
-      this.logger.warn(`Consulta do codigo ${code} no Open Food Facts falhou: ${String(error)}`);
+      this.logger.warn(
+        `Consulta do codigo ${code} em ${OPEN_FACTS_HOSTS[source]} falhou: ${String(error)}`,
+      );
       return null;
     }
   }

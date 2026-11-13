@@ -124,8 +124,10 @@ a partir de uma base externa:
 
 - [Cosmos (Bluesoft)](https://cosmos.bluesoft.com.br), base brasileira com NCM, quando
   `COSMOS_TOKEN` esta configurado (o plano gratuito tem limite diario de consultas);
-- [Open Food Facts](https://world.openfoodfacts.org), base aberta e gratuita (alimentos,
-  bebidas, higiene e limpeza), usada quando nao ha token.
+- bases abertas e gratuitas da familia Open Facts, consultadas em paralelo: Open Food Facts
+  (alimentos e bebidas), Open Beauty Facts (higiene e cosmeticos), Open Products Facts
+  (produtos em geral) e Open Pet Food Facts. Sao colaborativas e cobrem bem menos produtos
+  brasileiros que o Cosmos, entao para uso real o token do Cosmos e recomendado.
 
 `BARCODE_LOOKUP=off` desliga as consultas externas (o CI usa assim). Codigos com prefixo 2
 sao de uso interno (balanca, etiqueta propria) e saem na nota como `SEM GTIN`.

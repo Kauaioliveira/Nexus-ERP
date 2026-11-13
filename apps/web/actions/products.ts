@@ -106,7 +106,7 @@ export interface BarcodeLookupResult {
     imageUrl?: string;
     ncm?: string;
     cest?: string;
-    source: 'cosmos' | 'openfoodfacts';
+    source: 'cosmos' | 'openfoodfacts' | 'openbeautyfacts' | 'openproductsfacts' | 'openpetfoodfacts';
   } | null;
 }
 

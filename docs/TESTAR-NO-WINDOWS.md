@@ -67,7 +67,11 @@ Abra http://localhost:3000 e entre como admin.
    `https://IP-DO-PC:3000` no celular e aceite o aviso de certificado.
 3. **Produto que não existe**: bipe um produto real da sua casa. O PDV oferece
    *Cadastrar produto com este código*; o cadastro abre com nome, marca e NCM sugeridos
-   (Open Food Facts, ou Cosmos se você colocar um `COSMOS_TOKEN` no `.env` da API).
+   (bases abertas Open Food/Beauty/Products Facts, ou Cosmos se você colocar um
+   `COSMOS_TOKEN` no `.env` da API). As bases abertas são colaborativas e não conhecem
+   muitos produtos brasileiros; o Cosmos (conta gratuita em cosmos.bluesoft.com.br, com
+   limite diário de consultas) cobre bem mais e ainda traz o NCM. O botão de cadastrar só
+   aparece para administrador.
    Confira, ponha os preços e salve. Volte ao PDV e bipe de novo.
 4. *Leitor de código* e *Movimentações* também aceitam o leitor e a câmera.
 

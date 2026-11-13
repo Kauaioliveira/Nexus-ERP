@@ -94,6 +94,14 @@ export function BarcodeScanner({ canCreate }: { canCreate: boolean }) {
               </p>
             )}
             {!result.validGtin && <p className="mt-1">O código não é um GTIN válido.</p>}
+            {result.validGtin && !result.restricted && !result.suggestion && (
+              <p className="mt-1">
+                Ele também não está nas bases públicas consultadas. Cadastre os dados manualmente.
+              </p>
+            )}
+            {!canCreate && (
+              <p className="mt-1">Peça a um administrador para cadastrar o produto.</p>
+            )}
             {canCreate && (
               <Link
                 href={`/dashboard/products/new?barcode=${encodeURIComponent(result.code)}`}

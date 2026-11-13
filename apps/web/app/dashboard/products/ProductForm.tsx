@@ -39,7 +39,13 @@ const CSOSN_OPTIONS = [
   { value: '500', label: '500 - ICMS cobrado anteriormente por substituição tributária' },
 ];
 
-const SOURCE_LABELS = { cosmos: 'Cosmos (Bluesoft)', openfoodfacts: 'Open Food Facts' } as const;
+const SOURCE_LABELS = {
+  cosmos: 'Cosmos (Bluesoft)',
+  openfoodfacts: 'Open Food Facts',
+  openbeautyfacts: 'Open Beauty Facts',
+  openproductsfacts: 'Open Products Facts',
+  openpetfoodfacts: 'Open Pet Food Facts',
+} as const;
 
 export function ProductForm({
   action,
@@ -178,7 +184,8 @@ export function ProductForm({
             )}
             {lookup && lookup.validGtin && !lookup.restricted && !lookup.product && !lookup.suggestion && (
               <p className="text-slate-600">
-                Código válido, mas não encontrado nas bases consultadas. Preencha os dados manualmente.
+                Código válido, mas não encontrado nas bases públicas gratuitas. Preencha os dados manualmente.
+                Com um token do Cosmos (configurado no servidor), a cobertura de produtos brasileiros é bem maior.
               </p>
             )}
           </div>
